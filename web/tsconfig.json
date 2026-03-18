@@ -9,7 +9,8 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "rootDir": "src",
-    "noEmit": true
+    "noEmit": true,
+    "jsx": "react-jsx"
   },
   "include": ["src"]
 }
