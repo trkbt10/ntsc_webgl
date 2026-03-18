@@ -1,6 +1,10 @@
 ///|
-/// NTSC rate: 315/88 MHz * 4 ≈ 14.318 MHz
+/// NTSC rate: 315/88 MHz * 4 ≈ 14.318 MHz (at reference width 320)
 pub const NTSC_RATE : Double = 315000000.0 / 88.0 * 4.0
+
+///|
+/// Reference width for NTSC parameter tuning.
+pub const NTSC_REFERENCE_WIDTH : Int = 320
 
 ///|
 pub(all) enum VHSSpeed {

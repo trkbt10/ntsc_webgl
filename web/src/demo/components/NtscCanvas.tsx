@@ -17,14 +17,10 @@ export function NtscCanvas({ onReady, style }: NtscCanvasProps) {
   return (
     <canvas
       ref={refCallback}
-      width={320}
-      height={240}
       style={{
         display: "block",
         width: "100%",
         height: "100%",
-        objectFit: "cover",
-        imageRendering: "pixelated",
         ...style,
       }}
     />

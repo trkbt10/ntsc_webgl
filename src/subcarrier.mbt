@@ -37,23 +37,33 @@ pub fn chroma_into_luma(
 ) -> Unit {
   let width = yiq.width
   let height = yiq.height
+  let data = yiq.data
+  let hw = height * width
   for row = field; row < height; row = row + 2 {
-    let y_off = yiq.y_offset(row)
-    let i_off = yiq.i_offset(row)
-    let q_off = yiq.q_offset(row)
+    let row_off = row * width
+    let y_off = row_off
+    let i_off = hw + row_off
+    let q_off = hw + hw + row_off
     let xi = chroma_luma_xi(phase_shift, phase_offset, fieldno, row)
+    // Pre-compute the 4-element pattern for this row
+    let u0 = umult[xi & 3] * subcarrier_amplitude
+    let v0 = vmult[xi & 3] * subcarrier_amplitude
+    let u1 = umult[(xi + 1) & 3] * subcarrier_amplitude
+    let v1 = vmult[(xi + 1) & 3] * subcarrier_amplitude
+    let u2 = umult[(xi + 2) & 3] * subcarrier_amplitude
+    let v2 = vmult[(xi + 2) & 3] * subcarrier_amplitude
+    let u3 = umult[(xi + 3) & 3] * subcarrier_amplitude
+    let v3 = vmult[(xi + 3) & 3] * subcarrier_amplitude
+    let us = [u0, u1, u2, u3]
+    let vs = [v0, v1, v2, v3]
     for x in 0..<width {
-      let u = umult[(xi + x) & 3]
-      let v = vmult[(xi + x) & 3]
-      let i_val = yiq.data[i_off + x]
-      let q_val = yiq.data[q_off + x]
-      let chroma = (
-          i_val * subcarrier_amplitude * u + q_val * subcarrier_amplitude * v
-        ) /
-        50
-      yiq.data[y_off + x] = yiq.data[y_off + x] + chroma
-      yiq.data[i_off + x] = 0
-      yiq.data[q_off + x] = 0
+      let phase = x & 3
+      let i_val = data[i_off + x]
+      let q_val = data[q_off + x]
+      let chroma = (i_val * us[phase] + q_val * vs[phase]) / 50
+      data[y_off + x] = data[y_off + x] + chroma
+      data[i_off + x] = 0
+      data[q_off + x] = 0
     }
   }
 }
@@ -71,28 +81,27 @@ pub fn chroma_from_luma(
 ) -> Unit {
   let width = yiq.width
   let height = yiq.height
+  let data = yiq.data
+  let hw = height * width
+  // Allocate chroma buffer once outside row loop
+  let chroma = FixedArray::make(width, 0)
   for row = field; row < height; row = row + 2 {
-    let y_off = yiq.y_offset(row)
-    let i_off = yiq.i_offset(row)
-    let q_off = yiq.q_offset(row)
+    let row_off = row * width
+    let y_off = row_off
+    let i_off = hw + row_off
+    let q_off = hw + hw + row_off
     // Running sum to reconstruct smoothed luma
-    let mut sum = yiq.data[y_off] + yiq.data[y_off + 1]
-    // Build accumulated average (acc4 = running_sum / 4)
-    // and extract chroma oscillation (chroma = Y[x+2] - acc4)
-    // We compute this iteratively to match the Python vectorized version.
-    let chroma = FixedArray::make(width, 0)
+    let mut sum = data[y_off] + data[y_off + 1]
     // First pass: compute running sum and extract chroma
     for x in 0..<width {
-      // y2[x] = Y[x+2] (with zero padding at end)
-      let y2 = if x + 2 < width { yiq.data[y_off + x + 2] } else { 0 }
-      // yd4[x] = Y[x-2] (with zero padding at start)
-      let yd4 = if x >= 2 { yiq.data[y_off + x - 2] } else { 0 }
+      let y2 = if x + 2 < width { data[y_off + x + 2] } else { 0 }
+      let yd4 = if x >= 2 { data[y_off + x - 2] } else { 0 }
       if x > 0 {
         sum = sum + (y2 - yd4)
       }
       let acc4 = sum / 4
       chroma[x] = y2 - acc4
-      yiq.data[y_off + x] = acc4
+      data[y_off + x] = acc4
     }
     // Flip negative phases of subcarrier
     let xi = chroma_luma_xi(phase_shift, phase_offset, fieldno, row)
@@ -103,23 +112,23 @@ pub fn chroma_from_luma(
     for x = x_start + 3; x < width; x = x + 4 {
       chroma[x] = -chroma[x]
     }
-    // Scale chroma back
+    // Scale chroma back and negate (combined with the -chroma[x] used later)
+    let scale_num = 50
+    let scale_den = subcarrier_amplitude
     for x in 0..<width {
-      chroma[x] = chroma[x] * 50 / subcarrier_amplitude
+      chroma[x] = chroma[x] * scale_num / scale_den
     }
-    // Decode I and Q from chroma at xi-offset positions
-    // I comes from chroma[xi::2], Q from chroma[xi+1::2]
-    // First zero out I and Q
+    // Zero out I and Q
     for x in 0..<width {
-      yiq.data[i_off + x] = 0
-      yiq.data[q_off + x] = 0
+      data[i_off + x] = 0
+      data[q_off + x] = 0
     }
     // Sample at even positions
     let mut dst_idx = 0
     for x = xi; x < width; x = x + 2 {
       let even_dst = dst_idx * 2
       if even_dst < width {
-        yiq.data[i_off + even_dst] = -chroma[x]
+        data[i_off + even_dst] = -chroma[x]
       }
       dst_idx = dst_idx + 1
     }
@@ -127,23 +136,21 @@ pub fn chroma_from_luma(
     for x = xi + 1; x < width; x = x + 2 {
       let even_dst = dst_idx * 2
       if even_dst < width {
-        yiq.data[q_off + even_dst] = -chroma[x]
+        data[q_off + even_dst] = -chroma[x]
       }
       dst_idx = dst_idx + 1
     }
     // Interpolate odd-indexed samples
     for x = 1; x < width - 2; x = x + 2 {
-      yiq.data[i_off + x] = (yiq.data[i_off + x - 1] + yiq.data[i_off + x + 1]) >>
-        1
-      yiq.data[q_off + x] = (yiq.data[q_off + x - 1] + yiq.data[q_off + x + 1]) >>
-        1
+      data[i_off + x] = (data[i_off + x - 1] + data[i_off + x + 1]) >> 1
+      data[q_off + x] = (data[q_off + x - 1] + data[q_off + x + 1]) >> 1
     }
     // Zero tail
     if width >= 2 {
-      yiq.data[i_off + width - 2] = 0
-      yiq.data[i_off + width - 1] = 0
-      yiq.data[q_off + width - 2] = 0
-      yiq.data[q_off + width - 1] = 0
+      data[i_off + width - 2] = 0
+      data[i_off + width - 1] = 0
+      data[q_off + width - 2] = 0
+      data[q_off + width - 1] = 0
     }
   }
 }

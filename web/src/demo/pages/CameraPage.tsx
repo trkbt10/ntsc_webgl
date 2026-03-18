@@ -10,7 +10,7 @@ export function CameraPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [facingMode, setFacingMode] = useState("user");
+  const [facingMode, setFacingMode] = useState("environment");
   const facingRef = useRef(facingMode);
   facingRef.current = facingMode;
 
@@ -25,10 +25,11 @@ export function CameraPage() {
     if (video.srcObject) {
       (video.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
     }
+    const { width: pw, height: ph } = ntsc.processSize.current;
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
-        width: { ideal: 640 },
-        height: { ideal: 480 },
+        width: { ideal: pw || 640 },
+        height: { ideal: ph || 480 },
         facingMode: facing,
       },
       audio: false,

@@ -111,3 +111,47 @@ pub fn lowpass_filters(
     LowpassFilter::new(rate, cutoff, value=reset),
   )
 }
+
+///|
+/// Compute filter alpha from rate and cutoff frequency.
+pub fn lowpass_alpha(rate : Double, hz : Double) -> Double {
+  let time_interval = 1.0 / rate
+  let tau = 1.0 / (hz * 2.0 * @math.PI)
+  time_interval / (tau + time_interval)
+}
+
+///|
+/// Apply 3-stage cascade lowpass filter inline (no LowpassFilter struct allocation per row).
+/// Reads from src[src_off..src_off+len], writes final result to dst[dst_off..dst_off+len].
+/// Uses a Double temp buffer to avoid Int<->Double conversions between stages.
+pub fn lowpass_cascade3(
+  src : FixedArray[Int],
+  src_off : Int,
+  dst : FixedArray[Int],
+  dst_off : Int,
+  len : Int,
+  alpha : Double,
+) -> Unit {
+  let one_minus_alpha = 1.0 - alpha
+  // Pass 1: Int src -> Double (stored back in dst as Int for now)
+  let mut prev = 0.0
+  for i in 0..<len {
+    let sample = src[src_off + i].to_double()
+    prev = sample * alpha + prev * one_minus_alpha
+    dst[dst_off + i] = prev.to_int()
+  }
+  // Pass 2: dst (Int) -> src (Int)
+  prev = 0.0
+  for i in 0..<len {
+    let sample = dst[dst_off + i].to_double()
+    prev = sample * alpha + prev * one_minus_alpha
+    src[src_off + i] = prev.to_int()
+  }
+  // Pass 3: src -> dst
+  prev = 0.0
+  for i in 0..<len {
+    let sample = src[src_off + i].to_double()
+    prev = sample * alpha + prev * one_minus_alpha
+    dst[dst_off + i] = prev.to_int()
+  }
+}

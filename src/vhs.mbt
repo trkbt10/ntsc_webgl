@@ -1,23 +1,27 @@
 ///|
 /// VHS luma lowpass: 3-stage cascade + preemphasis.
-pub fn vhs_luma_lowpass(yiq : YiqFrame, field : Int, luma_cut : Double) -> Unit {
+pub fn vhs_luma_lowpass(
+  yiq : YiqFrame,
+  field : Int,
+  luma_cut : Double,
+  rate~ : Double = NTSC_RATE,
+) -> Unit {
   let width = yiq.width
   let height = yiq.height
-  let tmp1 = FixedArray::make(width, 0)
-  let tmp2 = FixedArray::make(width, 0)
+  let data = yiq.data
+  let tmp = FixedArray::make(width, 0)
   let hp_buf = FixedArray::make(width, 0.0)
+  let alpha = lowpass_alpha(rate, luma_cut)
   for row = field; row < height; row = row + 2 {
-    let y_off = yiq.y_offset(row)
-    let (lp0, lp1, lp2) = lowpass_filters(luma_cut, reset=16.0)
-    let pre = LowpassFilter::new(NTSC_RATE, luma_cut, value=16.0)
-    // 3-stage cascade
-    lp0.lowpass_array(yiq.data, y_off, tmp1, 0, width)
-    lp1.lowpass_array(tmp1, 0, tmp2, 0, width)
-    lp2.lowpass_array(tmp2, 0, tmp1, 0, width)
-    // Preemphasis: f3 = f2 + highpass(f2) * 1.6
-    pre.highpass_array(tmp1, 0, hp_buf, 0, width)
+    let y_off = row * width
+    lowpass_cascade3(data, y_off, tmp, 0, width, alpha)
     for x in 0..<width {
-      yiq.data[y_off + x] = (tmp1[x].to_double() + hp_buf[x] * 1.6).to_int()
+      data[y_off + x] = tmp[x]
+    }
+    let pre = LowpassFilter::new(rate, luma_cut, value=16.0)
+    pre.highpass_array(tmp, 0, hp_buf, 0, width)
+    for x in 0..<width {
+      data[y_off + x] = (tmp[x].to_double() + hp_buf[x] * 1.6).to_int()
     }
   }
 }
@@ -29,37 +33,36 @@ pub fn vhs_chroma_lowpass(
   field : Int,
   chroma_cut : Double,
   chroma_delay : Int,
+  rate~ : Double = NTSC_RATE,
 ) -> Unit {
   let width = yiq.width
   let height = yiq.height
-  let tmp1 = FixedArray::make(width, 0)
-  let tmp2 = FixedArray::make(width, 0)
+  let data = yiq.data
+  let hw = height * width
+  let tmp = FixedArray::make(width, 0)
+  let alpha = lowpass_alpha(rate, chroma_cut)
   // Process I channel
   for row = field; row < height; row = row + 2 {
-    let i_off = yiq.i_offset(row)
-    let (lp0, lp1, lp2) = lowpass_filters(chroma_cut, reset=0.0)
-    lp0.lowpass_array(yiq.data, i_off, tmp1, 0, width)
-    lp1.lowpass_array(tmp1, 0, tmp2, 0, width)
-    lp2.lowpass_array(tmp2, 0, tmp1, 0, width)
-    for x in 0..<(width - chroma_delay) {
-      yiq.data[i_off + x] = tmp1[x + chroma_delay]
+    let i_off = hw + row * width
+    lowpass_cascade3(data, i_off, tmp, 0, width, alpha)
+    let d = if chroma_delay < width { chroma_delay } else { width - 1 }
+    for x in 0..<(width - d) {
+      data[i_off + x] = tmp[x + d]
     }
-    for x in (width - chroma_delay)..<width {
-      yiq.data[i_off + x] = 0
+    for x in (width - d)..<width {
+      data[i_off + x] = 0
     }
   }
   // Process Q channel
   for row = field; row < height; row = row + 2 {
-    let q_off = yiq.q_offset(row)
-    let (lp0, lp1, lp2) = lowpass_filters(chroma_cut, reset=0.0)
-    lp0.lowpass_array(yiq.data, q_off, tmp1, 0, width)
-    lp1.lowpass_array(tmp1, 0, tmp2, 0, width)
-    lp2.lowpass_array(tmp2, 0, tmp1, 0, width)
-    for x in 0..<(width - chroma_delay) {
-      yiq.data[q_off + x] = tmp1[x + chroma_delay]
+    let q_off = hw + hw + row * width
+    lowpass_cascade3(data, q_off, tmp, 0, width, alpha)
+    let d = if chroma_delay < width { chroma_delay } else { width - 1 }
+    for x in 0..<(width - d) {
+      data[q_off + x] = tmp[x + d]
     }
-    for x in (width - chroma_delay)..<width {
-      yiq.data[q_off + x] = 0
+    for x in (width - d)..<width {
+      data[q_off + x] = 0
     }
   }
 }
@@ -69,7 +72,6 @@ pub fn vhs_chroma_lowpass(
 pub fn vhs_chroma_vert_blend(yiq : YiqFrame, field : Int) -> Unit {
   let width = yiq.width
   let height = yiq.height
-  // Start from field+2 to have a previous line
   let mut prev_i_off = yiq.i_offset(field)
   let mut prev_q_off = yiq.q_offset(field)
   for row = field + 2; row < height; row = row + 2 {
@@ -93,21 +95,21 @@ pub fn vhs_sharpen(
   field : Int,
   luma_cut : Double,
   sharpen : Double,
+  rate~ : Double = NTSC_RATE,
 ) -> Unit {
   let width = yiq.width
   let height = yiq.height
-  let tmp1 = FixedArray::make(width, 0)
-  let tmp2 = FixedArray::make(width, 0)
+  let data = yiq.data
+  let tmp = FixedArray::make(width, 0)
+  let alpha = lowpass_alpha(rate, luma_cut * 4.0)
+  let sharpen2 = sharpen * 2.0
   for row = field; row < height; row = row + 2 {
-    let y_off = yiq.y_offset(row)
-    let (lp0, lp1, lp2) = lowpass_filters(luma_cut * 4.0, reset=0.0)
-    lp0.lowpass_array(yiq.data, y_off, tmp1, 0, width)
-    lp1.lowpass_array(tmp1, 0, tmp2, 0, width)
-    lp2.lowpass_array(tmp2, 0, tmp1, 0, width)
+    let y_off = row * width
+    lowpass_cascade3(data, y_off, tmp, 0, width, alpha)
     for x in 0..<width {
-      let s = yiq.data[y_off + x].to_double()
-      let ts = tmp1[x].to_double()
-      yiq.data[y_off + x] = (s + (s - ts) * sharpen * 2.0).to_int()
+      let s = data[y_off + x].to_double()
+      let ts = tmp[x].to_double()
+      data[y_off + x] = (s + (s - ts) * sharpen2).to_int()
     }
   }
 }
@@ -129,15 +131,18 @@ pub fn vhs_head_switching(
     noise = x.to_double() / 1000000000.0 - 1.0
     noise = noise * config.vhs_head_switching_phase_noise
   }
-  let t = twidth.to_double() * (if config.output_ntsc { 262.5 } else { 312.5 })
+  let total_lines = if config.output_ntsc { 262.5 } else { 312.5 }
+  let t = twidth.to_double() * total_lines
   let p1 = (fmod(config.vhs_head_switching_point + noise, 1.0) * t).to_int()
   let mut y = p1 / twidth * 2 + field
   let p2 = (fmod(config.vhs_head_switching_phase + noise, 1.0) * t).to_int()
   let tx_init = p2 % twidth
-  let y_offset = if config.output_ntsc {
-    (262 - 240) * 2
+  let visible_lines = height / 2
+  let total_lines_int = total_lines.to_int()
+  let y_offset = if total_lines_int > visible_lines {
+    (total_lines_int - visible_lines) * 2
   } else {
-    (312 - 288) * 2
+    0
   }
   y = y - y_offset
   let ishif = if tx_init >= twidth / 2 { tx_init - twidth } else { tx_init }
@@ -149,7 +154,6 @@ pub fn vhs_head_switching(
     if y >= 0 {
       let y_off = yiq.y_offset(y)
       if shif != 0 {
-        // Copy Y row to tmp
         for x in 0..<width {
           tmp[x] = yiq.data[y_off + x]
         }
@@ -181,20 +185,18 @@ pub fn vhs_edge_wave(
   edge_wave : Int,
   luma_cut : Double,
   rng : XorWow,
+  rate~ : Double = NTSC_RATE,
 ) -> Unit {
   let width = yiq.width
   let height = yiq.height
   let field_height = (height - field + 1) / 2
-  // Generate random shifts
   let rnds = FixedArray::make(field_height, 0.0)
   for i in 0..<field_height {
     rnds[i] = rng.next_int(from=0, until=edge_wave).to_double()
   }
-  // Smooth with lowpass
-  let lp = LowpassFilter::new(NTSC_RATE, luma_cut)
+  let lp = LowpassFilter::new(rate, luma_cut)
   let smoothed = FixedArray::make(field_height, 0.0)
   lp.lowpass_doubles(rnds, smoothed, field_height)
-  // Apply shifts to all 3 planes
   let mut idx = 0
   for row = field; row < height; row = row + 2 {
     let shift_val = smoothed[idx].to_int()
@@ -202,11 +204,9 @@ pub fn vhs_edge_wave(
     if shift_val <= 0 {
       continue
     }
-    // Shift right by shift_val (pad left with zeros)
     let y_off = yiq.y_offset(row)
     let i_off = yiq.i_offset(row)
     let q_off = yiq.q_offset(row)
-    // Shift right: move pixels from [0..width-shift] to [shift..width]
     for x = width - 1; x >= shift_val; x = x - 1 {
       yiq.data[y_off + x] = yiq.data[y_off + x - shift_val]
       yiq.data[i_off + x] = yiq.data[i_off + x - shift_val]
@@ -250,17 +250,21 @@ pub fn emulate_vhs(
   fieldno : Int,
   config : NtscConfig,
   rng : XorWow,
+  rate~ : Double = NTSC_RATE,
+  rate_scale~ : Double = 1.0,
 ) -> Unit {
   let speed = config.output_vhs_tape_speed
   if config.vhs_edge_wave != 0 {
-    vhs_edge_wave(yiq, field, config.vhs_edge_wave, speed.luma_cut(), rng)
+    let scaled_wave = scale_px(config.vhs_edge_wave, rate_scale)
+    vhs_edge_wave(yiq, field, scaled_wave, speed.luma_cut(), rng, rate~)
   }
-  vhs_luma_lowpass(yiq, field, speed.luma_cut())
-  vhs_chroma_lowpass(yiq, field, speed.chroma_cut(), speed.chroma_delay())
+  vhs_luma_lowpass(yiq, field, speed.luma_cut(), rate~)
+  let scaled_delay = scale_px(speed.chroma_delay(), rate_scale)
+  vhs_chroma_lowpass(yiq, field, speed.chroma_cut(), scaled_delay, rate~)
   if config.vhs_chroma_vert_blend && config.output_ntsc {
     vhs_chroma_vert_blend(yiq, field)
   }
-  vhs_sharpen(yiq, field, speed.luma_cut(), config.vhs_out_sharpen)
+  vhs_sharpen(yiq, field, speed.luma_cut(), config.vhs_out_sharpen, rate~)
   if not(config.vhs_svideo_out) {
     chroma_into_luma(
       yiq,

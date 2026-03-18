@@ -1,31 +1,40 @@
 ///|
 /// Apply chroma lowpass filter (NTSC spec: I=1.3MHz, Q=600kHz).
 /// 3-stage cascade with delay compensation.
-pub fn composite_lowpass(yiq : YiqFrame, field : Int, _fieldno : Int) -> Unit {
+pub fn composite_lowpass(
+  yiq : YiqFrame,
+  field : Int,
+  _fieldno : Int,
+  rate~ : Double = NTSC_RATE,
+) -> Unit {
   let width = yiq.width
   let height = yiq.height
-  // Temp buffer for cascade filtering
+  let data = yiq.data
   let tmp = FixedArray::make(width, 0)
-  // Process I channel (p=1: cutoff=1.3MHz, delay=2) and Q channel (p=2: cutoff=600kHz, delay=4)
-  for p in 1..<=2 {
-    let cutoff = if p == 1 { 1300000.0 } else { 600000.0 }
-    let delay = if p == 1 { 2 } else { 4 }
-    let plane_off = if p == 1 { height * width } else { 2 * height * width }
-    for row = field; row < height; row = row + 2 {
-      let off = plane_off + row * width
-      let (lp0, lp1, lp2) = lowpass_filters(cutoff, reset=0.0)
-      // 3-stage cascade: src -> tmp -> src -> tmp
-      lp0.lowpass_array(yiq.data, off, tmp, 0, width)
-      lp1.lowpass_array(tmp, 0, yiq.data, off, width)
-      lp2.lowpass_array(yiq.data, off, tmp, 0, width)
-      // Apply delay compensation: shift left by 'delay' samples
-      for x in 0..<(width - delay) {
-        yiq.data[off + x] = tmp[x + delay]
-      }
-      // Zero the tail
-      for x in (width - delay)..<width {
-        yiq.data[off + x] = 0
-      }
+  let alpha_i = lowpass_alpha(rate, 1300000.0)
+  let alpha_q = lowpass_alpha(rate, 600000.0)
+  let hw = height * width
+  // Delay compensation scales with rate
+  let delay_i = (2.0 * rate / NTSC_RATE).to_int()
+  let delay_q = (4.0 * rate / NTSC_RATE).to_int()
+  // Process I channel (cutoff=1.3MHz)
+  for row = field; row < height; row = row + 2 {
+    let off = hw + row * width
+    lowpass_cascade3(data, off, tmp, 0, width, alpha_i)
+    let shift_i = if delay_i < width { delay_i } else { width - 1 }
+    FixedArray::unsafe_blit(data, off, tmp, shift_i, width - shift_i)
+    for x in (width - shift_i)..<width {
+      data[off + x] = 0
+    }
+  }
+  // Process Q channel (cutoff=600kHz)
+  for row = field; row < height; row = row + 2 {
+    let off = hw + hw + row * width
+    lowpass_cascade3(data, off, tmp, 0, width, alpha_q)
+    let shift_q = if delay_q < width { delay_q } else { width - 1 }
+    FixedArray::unsafe_blit(data, off, tmp, shift_q, width - shift_q)
+    for x in (width - shift_q)..<width {
+      data[off + x] = 0
     }
   }
 }
@@ -36,26 +45,29 @@ pub fn composite_lowpass_tv(
   yiq : YiqFrame,
   field : Int,
   _fieldno : Int,
+  rate~ : Double = NTSC_RATE,
 ) -> Unit {
   let width = yiq.width
   let height = yiq.height
+  let data = yiq.data
   let tmp = FixedArray::make(width, 0)
-  let delay = 1
-  for p in 1..<=2 {
-    let plane_off = if p == 1 { height * width } else { 2 * height * width }
-    for row = field; row < height; row = row + 2 {
-      let off = plane_off + row * width
-      let (lp0, lp1, lp2) = lowpass_filters(2600000.0, reset=0.0)
-      lp0.lowpass_array(yiq.data, off, tmp, 0, width)
-      lp1.lowpass_array(tmp, 0, yiq.data, off, width)
-      lp2.lowpass_array(yiq.data, off, tmp, 0, width)
-      for x in 0..<(width - delay) {
-        yiq.data[off + x] = tmp[x + delay]
-      }
-      for x in (width - delay)..<width {
-        yiq.data[off + x] = 0
-      }
-    }
+  let alpha = lowpass_alpha(rate, 2600000.0)
+  let hw = height * width
+  let delay = (1.0 * rate / NTSC_RATE).to_int()
+  let shift = if delay < width { delay } else { width - 1 }
+  // Process I channel
+  for row = field; row < height; row = row + 2 {
+    let off = hw + row * width
+    lowpass_cascade3(data, off, tmp, 0, width, alpha)
+    FixedArray::unsafe_blit(data, off, tmp, shift, width - shift)
+    data[off + width - 1] = 0
+  }
+  // Process Q channel
+  for row = field; row < height; row = row + 2 {
+    let off = hw + hw + row * width
+    lowpass_cascade3(data, off, tmp, 0, width, alpha)
+    FixedArray::unsafe_blit(data, off, tmp, shift, width - shift)
+    data[off + width - 1] = 0
   }
 }
 
@@ -66,13 +78,14 @@ pub fn composite_preemphasis(
   field : Int,
   preemphasis : Double,
   preemphasis_cut : Double,
+  rate~ : Double = NTSC_RATE,
 ) -> Unit {
   let width = yiq.width
   let height = yiq.height
   let hp_buf = FixedArray::make(width, 0.0)
   for row = field; row < height; row = row + 2 {
     let off = yiq.y_offset(row)
-    let pre = LowpassFilter::new(NTSC_RATE, preemphasis_cut, value=16.0)
+    let pre = LowpassFilter::new(rate, preemphasis_cut, value=16.0)
     pre.highpass_array(yiq.data, off, hp_buf, 0, width)
     for x in 0..<width {
       yiq.data[off + x] = (yiq.data[off + x].to_double() +

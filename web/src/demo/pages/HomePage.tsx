@@ -49,6 +49,14 @@ export function HomePage() {
     }
   }, [ntsc.params, imageLoaded, reprocess]);
 
+  // Re-process on canvas resize
+  useEffect(() => {
+    if (imageLoaded) {
+      ntsc.setOnResize(reprocess);
+      return () => ntsc.setOnResize(null);
+    }
+  }, [imageLoaded, reprocess, ntsc.setOnResize]);
+
   if (ntsc.error) {
     return (
       <div

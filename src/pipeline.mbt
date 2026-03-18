@@ -8,6 +8,9 @@ pub(all) struct NtscProcessor {
   mut yiq : YiqFrame
   mut width : Int
   mut height : Int
+  // Resolution scaling
+  mut effective_rate : Double
+  mut rate_scale : Double
 }
 
 ///|
@@ -19,6 +22,8 @@ pub fn NtscProcessor::new(config : NtscConfig) -> NtscProcessor {
     yiq: YiqFrame::new(0, 0),
     width: 0,
     height: 0,
+    effective_rate: NTSC_RATE,
+    rate_scale: 1.0,
   }
 }
 
@@ -33,7 +38,15 @@ fn NtscProcessor::ensure_buffers(
     self.width = width
     self.height = height
     self.yiq = YiqFrame::new(width, height)
+    self.rate_scale = width.to_double() / NTSC_REFERENCE_WIDTH.to_double()
+    self.effective_rate = NTSC_RATE * self.rate_scale
   }
+}
+
+///|
+/// Scale a pixel-count parameter by the resolution ratio.
+fn scale_px(value : Int, rate_scale : Double) -> Int {
+  (value.to_double() * rate_scale).to_int()
 }
 
 ///|
@@ -51,16 +64,23 @@ pub fn NtscProcessor::process_frame(
   let fieldno = self.field_number
   let yiq = self.yiq
   let config = self.config
+  let rate = self.effective_rate
+  let rs = self.rate_scale
   // 1. Convert RGBA to YIQ
   rgba2yiq(rgba_in, width, height, yiq)
   // 2. Color bleed (before)
   if config.color_bleed_before &&
     (config.color_bleed_vert != 0 || config.color_bleed_horiz != 0) {
-    color_bleed(yiq, field, config.color_bleed_horiz, config.color_bleed_vert)
+    color_bleed(
+      yiq,
+      field,
+      scale_px(config.color_bleed_horiz, rs),
+      scale_px(config.color_bleed_vert, rs),
+    )
   }
   // 3. Input chroma lowpass
   if config.composite_in_chroma_lowpass {
-    composite_lowpass(yiq, field, fieldno)
+    composite_lowpass(yiq, field, fieldno, rate~)
   }
   // 4. Encode: chroma into luma
   chroma_into_luma(
@@ -79,6 +99,7 @@ pub fn NtscProcessor::process_frame(
       field,
       config.composite_preemphasis,
       config.composite_preemphasis_cut,
+      rate~,
     )
   }
   // 6. Video noise
@@ -115,7 +136,7 @@ pub fn NtscProcessor::process_frame(
   }
   // 11. VHS emulation
   if config.emulating_vhs {
-    emulate_vhs(yiq, field, fieldno, config, self.rng)
+    emulate_vhs(yiq, field, fieldno, config, self.rng, rate~, rate_scale=rs)
   }
   // 12. Chroma loss
   if config.video_chroma_loss != 0 {
@@ -124,18 +145,28 @@ pub fn NtscProcessor::process_frame(
   // 13. Output chroma lowpass
   if config.composite_out_chroma_lowpass {
     if config.composite_out_chroma_lowpass_lite {
-      composite_lowpass_tv(yiq, field, fieldno)
+      composite_lowpass_tv(yiq, field, fieldno, rate~)
     } else {
-      composite_lowpass(yiq, field, fieldno)
+      composite_lowpass(yiq, field, fieldno, rate~)
     }
   }
   // 14. Color bleed (after)
   if not(config.color_bleed_before) &&
     (config.color_bleed_vert != 0 || config.color_bleed_horiz != 0) {
-    color_bleed(yiq, field, config.color_bleed_horiz, config.color_bleed_vert)
+    color_bleed(
+      yiq,
+      field,
+      scale_px(config.color_bleed_horiz, rs),
+      scale_px(config.color_bleed_vert, rs),
+    )
   }
   // 15. Blur chroma (simulate reduced chroma bandwidth)
-  blur_chroma(yiq, field)
+  let chroma_step = if rs > 1.0 {
+    (2.0 * rs).to_int()
+  } else {
+    2
+  }
+  blur_chroma(yiq, field, chroma_step~)
   // 16. Convert YIQ back to RGBA
   yiq2rgba(yiq, field, rgba_out)
   // Advance field
@@ -143,23 +174,35 @@ pub fn NtscProcessor::process_frame(
 }
 
 ///|
-/// Simple 2x chroma blur (downsample + upsample by averaging).
-/// Simulates YUV 4:2:0 subsampling.
-fn blur_chroma(yiq : YiqFrame, field : Int) -> Unit {
+/// Chroma blur with configurable step size.
+/// At reference width (320), step=2. At higher resolutions, step scales proportionally.
+fn blur_chroma(
+  yiq : YiqFrame,
+  field : Int,
+  chroma_step~ : Int = 2,
+) -> Unit {
   let width = yiq.width
   let height = yiq.height
-  // Simple horizontal 2x blur for I and Q
+  let data = yiq.data
+  let hw = height * width
+  let step = chroma_step
   for row = field; row < height; row = row + 2 {
-    let i_off = yiq.i_offset(row)
-    let q_off = yiq.q_offset(row)
-    // Horizontal downsample by averaging pairs, then spread back
-    for x = 0; x < width - 1; x = x + 2 {
-      let avg_i = (yiq.data[i_off + x] + yiq.data[i_off + x + 1]) / 2
-      let avg_q = (yiq.data[q_off + x] + yiq.data[q_off + x + 1]) / 2
-      yiq.data[i_off + x] = avg_i
-      yiq.data[i_off + x + 1] = avg_i
-      yiq.data[q_off + x] = avg_q
-      yiq.data[q_off + x + 1] = avg_q
+    let row_off = row * width
+    let i_off = hw + row_off
+    let q_off = hw + hw + row_off
+    for x = 0; x < width - step + 1; x = x + step {
+      let mut sum_i = 0
+      let mut sum_q = 0
+      for k in 0..<step {
+        sum_i = sum_i + data[i_off + x + k]
+        sum_q = sum_q + data[q_off + x + k]
+      }
+      let avg_i = sum_i / step
+      let avg_q = sum_q / step
+      for k in 0..<step {
+        data[i_off + x + k] = avg_i
+        data[q_off + x + k] = avg_q
+      }
     }
   }
 }
