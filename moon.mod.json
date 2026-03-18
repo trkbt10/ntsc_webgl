@@ -1,8 +1,8 @@
 {
-  "name": "trkbt10/ntsc_webgl",
+  "name": "trkbt10/ntsc",
   "version": "0.1.0",
   "readme": "README.mbt.md",
-  "repository": "",
+  "repository": "https://github.com/trkbt10/ntsc_webgl",
   "license": "Apache-2.0",
   "keywords": ["ntsc", "video", "vhs", "webgl", "wasm", "signal-processing"],
   "description": "NTSC/VHS video artifact emulator for MoonBit. Ported from zhuker/ntsc."

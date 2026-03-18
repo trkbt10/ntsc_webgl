@@ -1,8 +1,12 @@
-# trkbt10/ntsc_webgl
+# trkbt10/ntsc
 
 NTSC/VHS video artifact emulator for [MoonBit](https://moonbitlang.com).
 
 Ported from [zhuker/ntsc](https://github.com/zhuker/ntsc) (Python, Apache-2.0).
+
+## Demo
+
+https://trkbt10.github.io/ntsc_webgl/
 
 ## Features
 
@@ -16,7 +20,7 @@ Ported from [zhuker/ntsc](https://github.com/zhuker/ntsc) (Python, Apache-2.0).
 ## Install
 
 ```bash
-moon add trkbt10/ntsc_webgl
+moon add trkbt10/ntsc
 ```
 
 ## Usage

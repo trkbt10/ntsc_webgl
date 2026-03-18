@@ -1,5 +1,5 @@
 import {
-  "trkbt10/ntsc_webgl/src" @ntsc,
+  "trkbt10/ntsc/src" @ntsc,
 }
 
 options(
