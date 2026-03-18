@@ -1,0 +1,148 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "trkbt10/ntsc_webgl/src"
+
+// Values
+pub const NTSC_RATE : Double = 14318181.8182
+
+pub fn chroma_from_luma(YiqFrame, Int, Int, Int, Int, Int) -> Unit
+
+pub fn chroma_into_luma(YiqFrame, Int, Int, Int, Int, Int) -> Unit
+
+pub fn color_bleed(YiqFrame, Int, Int, Int) -> Unit
+
+pub fn composite_lowpass(YiqFrame, Int, Int) -> Unit
+
+pub fn composite_lowpass_tv(YiqFrame, Int, Int) -> Unit
+
+pub fn composite_preemphasis(YiqFrame, Int, Double, Double) -> Unit
+
+pub fn emulate_vhs(YiqFrame, Int, Int, NtscConfig, XorWow) -> Unit
+
+pub fn lowpass_filters(Double, reset? : Double, rate? : Double) -> (LowpassFilter, LowpassFilter, LowpassFilter)
+
+pub fn rgba2yiq(FixedArray[Byte], Int, Int, YiqFrame) -> Unit
+
+pub fn vhs_chroma_loss(YiqFrame, Int, Int, XorWow) -> Unit
+
+pub fn vhs_chroma_lowpass(YiqFrame, Int, Double, Int) -> Unit
+
+pub fn vhs_chroma_vert_blend(YiqFrame, Int) -> Unit
+
+pub fn vhs_edge_wave(YiqFrame, Int, Int, Double, XorWow) -> Unit
+
+pub fn vhs_head_switching(YiqFrame, Int, NtscConfig, XorWow) -> Unit
+
+pub fn vhs_luma_lowpass(YiqFrame, Int, Double) -> Unit
+
+pub fn vhs_sharpen(YiqFrame, Int, Double, Double) -> Unit
+
+pub fn video_chroma_noise(YiqFrame, Int, Int, XorWow) -> Unit
+
+pub fn video_chroma_phase_noise(YiqFrame, Int, Int, XorWow) -> Unit
+
+pub fn video_noise(YiqFrame, Int, Int, XorWow) -> Unit
+
+pub fn yiq2rgba(YiqFrame, Int, FixedArray[Byte]) -> Unit
+
+// Errors
+
+// Types and methods
+pub(all) struct LowpassFilter {
+  alpha : Double
+  mut prev : Double
+}
+pub fn LowpassFilter::highpass(Self, Double) -> Double
+pub fn LowpassFilter::highpass_array(Self, FixedArray[Int], Int, FixedArray[Double], Int, Int) -> Unit
+pub fn LowpassFilter::lowpass(Self, Double) -> Double
+pub fn LowpassFilter::lowpass_array(Self, FixedArray[Int], Int, FixedArray[Int], Int, Int) -> Unit
+pub fn LowpassFilter::lowpass_array_inplace(Self, FixedArray[Int], Int, Int, Int) -> Unit
+pub fn LowpassFilter::lowpass_doubles(Self, FixedArray[Double], FixedArray[Double], Int) -> Unit
+pub fn LowpassFilter::new(Double, Double, value? : Double) -> Self
+
+pub(all) struct NtscConfig {
+  mut composite_preemphasis : Double
+  mut composite_preemphasis_cut : Double
+  mut vhs_out_sharpen : Double
+  mut vhs_edge_wave : Int
+  mut vhs_head_switching : Bool
+  mut vhs_head_switching_point : Double
+  mut vhs_head_switching_phase : Double
+  mut vhs_head_switching_phase_noise : Double
+  mut color_bleed_before : Bool
+  mut color_bleed_horiz : Int
+  mut color_bleed_vert : Int
+  mut ringing : Double
+  mut enable_ringing2 : Bool
+  mut ringing_power : Int
+  mut ringing_shift : Int
+  mut freq_noise_size : Double
+  mut freq_noise_amplitude : Double
+  mut composite_in_chroma_lowpass : Bool
+  mut composite_out_chroma_lowpass : Bool
+  mut composite_out_chroma_lowpass_lite : Bool
+  mut video_chroma_noise : Int
+  mut video_chroma_phase_noise : Int
+  mut video_chroma_loss : Int
+  mut video_noise : Int
+  mut subcarrier_amplitude : Int
+  mut subcarrier_amplitude_back : Int
+  mut emulating_vhs : Bool
+  mut nocolor_subcarrier : Bool
+  mut vhs_chroma_vert_blend : Bool
+  mut vhs_svideo_out : Bool
+  mut output_ntsc : Bool
+  mut video_scanline_phase_shift : Int
+  mut video_scanline_phase_shift_offset : Int
+  mut output_vhs_tape_speed : VHSSpeed
+}
+pub fn NtscConfig::new() -> Self
+
+pub(all) struct NtscProcessor {
+  config : NtscConfig
+  rng : XorWow
+  mut field_number : Int
+  mut yiq : YiqFrame
+  mut width : Int
+  mut height : Int
+}
+pub fn NtscProcessor::new(NtscConfig) -> Self
+pub fn NtscProcessor::process_frame(Self, FixedArray[Byte], Int, Int, FixedArray[Byte]) -> Unit
+
+pub(all) enum VHSSpeed {
+  SP
+  LP
+  EP
+}
+pub fn VHSSpeed::chroma_cut(Self) -> Double
+pub fn VHSSpeed::chroma_delay(Self) -> Int
+pub fn VHSSpeed::luma_cut(Self) -> Double
+
+pub(all) struct XorWow {
+  mut x : Int
+  mut y : Int
+  mut z : Int
+  mut w : Int
+  mut v : Int
+  mut addend : Int
+}
+pub fn XorWow::new(Int, Int) -> Self
+pub fn XorWow::next_int(Self, from~ : Int, until~ : Int) -> Int
+pub fn XorWow::rand(Self) -> Int
+
+pub(all) struct YiqFrame {
+  data : FixedArray[Int]
+  width : Int
+  height : Int
+}
+pub fn YiqFrame::i(Self, Int, Int) -> Int
+pub fn YiqFrame::new(Int, Int) -> Self
+pub fn YiqFrame::q(Self, Int, Int) -> Int
+pub fn YiqFrame::set_i(Self, Int, Int, Int) -> Unit
+pub fn YiqFrame::set_q(Self, Int, Int, Int) -> Unit
+pub fn YiqFrame::set_y(Self, Int, Int, Int) -> Unit
+pub fn YiqFrame::y(Self, Int, Int) -> Int
+
+// Type aliases
+
+// Traits
+

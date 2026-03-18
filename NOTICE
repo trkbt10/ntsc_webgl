@@ -1,0 +1,14 @@
+ntsc_webgl
+Copyright 2024-2026 trkbt10
+
+This product includes software ported from the following projects:
+
+  ntsc - NTSC video emulator
+  Copyright 2019 Alex Zhukov (zhuker)
+  https://github.com/zhuker/ntsc
+  Licensed under the Apache License, Version 2.0
+
+  composite-video-simulator
+  Copyright 2018 Jonathan Campbell (joncampbell123)
+  https://github.com/joncampbell123/composite-video-simulator
+  Licensed under the Apache License, Version 2.0

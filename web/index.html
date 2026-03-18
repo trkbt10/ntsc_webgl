@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>NTSC Cam</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+body { font-family: -apple-system, sans-serif; color: #fff; touch-action: none; }
+
+/* --- Viewfinder (fullscreen canvas) --- */
+#output-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+
+/* --- Top bar --- */
+#topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
+  z-index: 10;
+  pointer-events: none;
+}
+#topbar > * { pointer-events: auto; }
+#status {
+  font-size: 12px;
+  color: rgba(255,255,255,0.7);
+  letter-spacing: 0.5px;
+}
+#fps {
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Settings toggle button --- */
+#settings-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #fff;
+  font-size: 22px;
+  cursor: pointer;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+#settings-btn:hover { background: rgba(255,255,255,0.25); }
+#settings-btn.active { background: rgba(255,255,255,0.3); }
+
+/* --- Camera flip button --- */
+#flip-btn {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+#flip-btn:hover { background: rgba(255,255,255,0.25); }
+
+/* --- Settings panel (slide-up drawer) --- */
+#panel {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  max-height: 60vh;
+  background: rgba(20, 20, 20, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px 16px 0 0;
+  z-index: 30;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+#panel.open { transform: translateY(0); }
+#panel-handle {
+  width: 36px;
+  height: 4px;
+  background: rgba(255,255,255,0.3);
+  border-radius: 2px;
+  margin: 10px auto 6px;
+}
+#panel-content { padding: 4px 20px 80px; }
+
+/* --- Preset row --- */
+.preset-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.preset-btn {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: transparent;
+  color: rgba(255,255,255,0.8);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.preset-btn:hover { background: rgba(255,255,255,0.1); }
+.preset-btn.active {
+  background: rgba(255,255,255,0.2);
+  border-color: rgba(255,255,255,0.4);
+  color: #fff;
+}
+
+/* --- Section title --- */
+.section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: rgba(255,255,255,0.35);
+  margin: 14px 0 8px;
+}
+
+/* --- Control row --- */
+.ctl {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.ctl-label {
+  font-size: 13px;
+  color: rgba(255,255,255,0.7);
+  min-width: 90px;
+  flex-shrink: 0;
+}
+.ctl input[type="range"] {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255,255,255,0.15);
+  border-radius: 2px;
+  outline: none;
+}
+.ctl input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+}
+.ctl .ctl-val {
+  font-size: 12px;
+  color: rgba(255,255,255,0.4);
+  min-width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Toggle switch --- */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.toggle-row .ctl-label { min-width: unset; }
+.toggle {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  flex-shrink: 0;
+}
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.15);
+  border-radius: 13px;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+.toggle-track::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+.toggle input:checked + .toggle-track {
+  background: rgba(100, 220, 100, 0.6);
+}
+.toggle input:checked + .toggle-track::after {
+  transform: translateX(18px);
+}
+
+/* --- Hidden elements --- */
+video, #capture-canvas { display: none; }
+
+/* --- Loading overlay --- */
+#loading {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  transition: opacity 0.4s;
+}
+#loading.hide {
+  opacity: 0;
+  pointer-events: none;
+}
+#loading-text {
+  font-size: 14px;
+  color: rgba(255,255,255,0.5);
+  margin-top: 16px;
+}
+</style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div id="loading">
+  <div id="loading-text">Initializing...</div>
+</div>
+
+<!-- Viewfinder -->
+<canvas id="output-canvas" width="320" height="240"></canvas>
+
+<!-- Top bar -->
+<div id="topbar">
+  <span id="status"></span>
+  <span id="fps"></span>
+</div>
+
+<!-- Bottom buttons -->
+<button id="flip-btn" title="Flip Camera">&#x21C4;</button>
+<button id="settings-btn" title="Settings">&#x2699;</button>
+
+<!-- Settings drawer -->
+<div id="panel">
+  <div id="panel-handle"></div>
+  <div id="panel-content">
+
+    <!-- Presets -->
+    <div class="preset-row">
+      <button class="preset-btn active" data-preset="broadcast">Broadcast</button>
+      <button class="preset-btn" data-preset="vhs">VHS</button>
+      <button class="preset-btn" data-preset="bad_reception">Bad Signal</button>
+      <button class="preset-btn" data-preset="clean">Clean</button>
+    </div>
+
+    <!-- Signal -->
+    <div class="section-title">Signal</div>
+    <div class="ctl">
+      <span class="ctl-label">Noise</span>
+      <input type="range" id="video_noise" min="0" max="200" value="2">
+      <span class="ctl-val" id="v_video_noise">2</span>
+    </div>
+    <div class="ctl">
+      <span class="ctl-label">Preemphasis</span>
+      <input type="range" id="composite_preemphasis" min="0" max="80" value="0">
+      <span class="ctl-val" id="v_composite_preemphasis">0</span>
+    </div>
+    <div class="ctl">
+      <span class="ctl-label">Subcarrier</span>
+      <input type="range" id="subcarrier_amplitude" min="10" max="200" value="50">
+      <span class="ctl-val" id="v_subcarrier_amplitude">50</span>
+    </div>
+
+    <!-- Color -->
+    <div class="section-title">Color</div>
+    <div class="ctl">
+      <span class="ctl-label">Chroma Noise</span>
+      <input type="range" id="video_chroma_noise" min="0" max="4000" value="0">
+      <span class="ctl-val" id="v_video_chroma_noise">0</span>
+    </div>
+    <div class="ctl">
+      <span class="ctl-label">Phase Noise</span>
+      <input type="range" id="video_chroma_phase_noise" min="0" max="50" value="0">
+      <span class="ctl-val" id="v_video_chroma_phase_noise">0</span>
+    </div>
+    <div class="ctl">
+      <span class="ctl-label">Color Bleed H</span>
+      <input type="range" id="color_bleed_horiz" min="0" max="10" value="0">
+      <span class="ctl-val" id="v_color_bleed_horiz">0</span>
+    </div>
+    <div class="ctl">
+      <span class="ctl-label">Color Bleed V</span>
+      <input type="range" id="color_bleed_vert" min="0" max="10" value="0">
+      <span class="ctl-val" id="v_color_bleed_vert">0</span>
+    </div>
+    <div class="ctl">
+      <span class="ctl-label">Chroma Loss</span>
+      <input type="range" id="video_chroma_loss" min="0" max="50000" value="0">
+      <span class="ctl-val" id="v_video_chroma_loss">0</span>
+    </div>
+
+    <!-- Filter -->
+    <div class="section-title">Filter</div>
+    <div class="toggle-row">
+      <span class="ctl-label">Input Lowpass</span>
+      <label class="toggle">
+        <input type="checkbox" id="composite_in_chroma_lowpass" checked>
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <span class="ctl-label">Output Lowpass</span>
+      <label class="toggle">
+        <input type="checkbox" id="composite_out_chroma_lowpass" checked>
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+
+    <!-- VHS -->
+    <div class="section-title">VHS</div>
+    <div class="toggle-row">
+      <span class="ctl-label">VHS Mode</span>
+      <label class="toggle">
+        <input type="checkbox" id="emulating_vhs">
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+    <div class="ctl">
+      <span class="ctl-label">Sharpen</span>
+      <input type="range" id="vhs_out_sharpen" min="10" max="50" value="15">
+      <span class="ctl-val" id="v_vhs_out_sharpen">1.5</span>
+    </div>
+    <div class="ctl">
+      <span class="ctl-label">Edge Wave</span>
+      <input type="range" id="vhs_edge_wave" min="0" max="10" value="0">
+      <span class="ctl-val" id="v_vhs_edge_wave">0</span>
+    </div>
+
+  </div>
+</div>
+
+<video id="camera" autoplay playsinline muted></video>
+<canvas id="capture-canvas"></canvas>
+<script type="module" src="./src/demo/main.ts"></script>
+</body>
+</html>

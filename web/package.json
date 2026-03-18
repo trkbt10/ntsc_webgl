@@ -1,0 +1,48 @@
+{
+  "name": "ntsc-wasm",
+  "version": "0.1.0",
+  "description": "NTSC/VHS video artifact emulator — MoonBit WASM",
+  "type": "module",
+  "main": "./dist-lib/index.js",
+  "module": "./dist-lib/index.js",
+  "types": "./dist-lib/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist-lib/index.js",
+      "types": "./dist-lib/index.d.ts"
+    },
+    "./ntsc.wasm": "./_build/cmd/wasm/wasm.wasm"
+  },
+  "files": [
+    "dist-lib",
+    "_build/cmd/wasm/wasm.wasm"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build:wasm": "cd .. && moon build --target wasm-gc && mkdir -p web/_build/cmd/wasm && cp _build/wasm-gc/debug/build/cmd/wasm/wasm.wasm web/_build/cmd/wasm/",
+    "build:lib": "npm run build:wasm && vite build --mode lib",
+    "build:demo": "npm run build:wasm && vite build",
+    "build": "npm run build:lib && npm run build:demo",
+    "preview": "vite preview",
+    "prepublishOnly": "npm run build:lib"
+  },
+  "keywords": [
+    "ntsc",
+    "vhs",
+    "video",
+    "wasm",
+    "webgl",
+    "filter",
+    "moonbit"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0",
+    "vite-plugin-dts": "^4.5.4"
+  }
+}

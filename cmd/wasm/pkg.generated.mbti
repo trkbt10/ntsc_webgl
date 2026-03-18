@@ -1,0 +1,24 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "trkbt10/ntsc_webgl/cmd/wasm"
+
+// Values
+pub fn get_output_chunk(Int, Int) -> String
+
+pub fn get_output_length() -> Int
+
+pub fn init_processor(Int, Int) -> Unit
+
+pub fn process_frame() -> Unit
+
+pub fn push_frame(String) -> Unit
+
+pub fn set_param(String, Double) -> Unit
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

@@ -1,0 +1,20 @@
+import {
+  "trkbt10/ntsc_webgl/src" @ntsc,
+}
+
+options(
+  "is-main": true,
+  link: {
+    "wasm-gc": {
+      "exports": [
+        "init_processor:initProcessor",
+        "set_param:setParam",
+        "push_frame:pushFrame",
+        "process_frame:processFrame",
+        "get_output_chunk:getOutputChunk",
+        "get_output_length:getOutputLength",
+      ],
+      "use-js-builtin-string": true,
+    },
+  },
+)
