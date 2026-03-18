@@ -40,25 +40,17 @@ export interface NtscHandle {
   height: number;
 }
 
-const CHUNK_SIZE = 8192;
+/**
+ * Encode Uint8Array as a latin1 string for passing to WASM.
+ *
+ * wasm-gc with js-string builtins has no direct Uint8Array interop;
+ * latin1 string encoding (1 char = 1 byte) is the standard workaround
+ * used across MoonBit WASM projects.
+ */
+const latin1Decoder = new TextDecoder("latin1");
 
 function bytesToLatin1(bytes: Uint8Array): string {
-  const chunks: string[] = [];
-  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
-    chunks.push(
-      String.fromCharCode.apply(
-        null,
-        Array.from(bytes.subarray(i, i + CHUNK_SIZE)),
-      ),
-    );
-  }
-  return chunks.join("");
-}
-
-function latin1ToBytes(str: string): Uint8Array {
-  const bytes = new Uint8Array(str.length);
-  for (let i = 0; i < str.length; i++) bytes[i] = str.charCodeAt(i);
-  return bytes;
+  return latin1Decoder.decode(bytes);
 }
 
 /**
@@ -133,10 +125,9 @@ export function processNtscFrame(
   handle.exports.processFrame();
 
   const outputLen = handle.exports.getOutputLength();
+  const outputStr = handle.exports.getOutputChunk(0, outputLen);
   const out = rgbaOut ?? new Uint8Array(outputLen);
-  for (let offset = 0; offset < outputLen; offset += CHUNK_SIZE) {
-    const len = Math.min(CHUNK_SIZE, outputLen - offset);
-    out.set(latin1ToBytes(handle.exports.getOutputChunk(offset, len)), offset);
-  }
+  // latin1 decode: each char code is one byte
+  for (let i = 0; i < outputLen; i++) out[i] = outputStr.charCodeAt(i);
   return out;
 }
