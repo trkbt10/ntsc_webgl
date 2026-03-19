@@ -1,22 +1,12 @@
-import { useCallback } from "react";
-
 interface NtscCanvasProps {
-  onReady: (canvas: HTMLCanvasElement) => void;
+  canvasRef: (node: HTMLCanvasElement | null) => void;
   style?: React.CSSProperties;
 }
 
-export function NtscCanvas({ onReady, style }: NtscCanvasProps) {
-  // Use ref callback — fires once when the element mounts
-  const refCallback = useCallback(
-    (node: HTMLCanvasElement | null) => {
-      if (node) onReady(node);
-    },
-    [onReady],
-  );
-
+export function NtscCanvas({ canvasRef, style }: NtscCanvasProps) {
   return (
     <canvas
-      ref={refCallback}
+      ref={canvasRef}
       style={{
         display: "block",
         width: "100%",

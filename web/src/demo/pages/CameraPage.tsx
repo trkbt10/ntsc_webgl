@@ -1,18 +1,37 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Link } from "react-router";
 import { Drawer } from "react-panel-layout";
 import { NtscCanvas } from "../components/NtscCanvas";
 import { SettingsPanel } from "../components/SettingsPanel";
-import { useNtsc } from "../hooks/useNtsc";
+import { useNtscPipeline } from "../hooks/useNtscPipeline";
+import {
+  DEFAULT_PARAMS,
+  DEFAULT_PRESET_NAME,
+  createParamHandlers,
+  type ParamState,
+} from "../presets";
 
 export function CameraPage() {
-  const ntsc = useNtsc();
+  const { canvasRef, pipeline, ready, error: pipelineError, fps } = useNtscPipeline();
+
+  const [paramValues, setParamValues] = useState<ParamState>(DEFAULT_PARAMS);
+  const [activePreset, setActivePreset] = useState(DEFAULT_PRESET_NAME);
+  const params = useMemo(
+    () => createParamHandlers(pipeline, setParamValues, setActivePreset),
+    [pipeline],
+  );
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [facingMode, setFacingMode] = useState("environment");
   const facingRef = useRef(facingMode);
   facingRef.current = facingMode;
+
+  useEffect(() => {
+    if (pipeline) params.applyPreset(DEFAULT_PRESET_NAME);
+  }, [pipeline]);
 
   const startCamera = useCallback(async (facing: string) => {
     if (!videoRef.current) {
@@ -21,42 +40,35 @@ export function CameraPage() {
       videoRef.current.playsInline = true;
       videoRef.current.muted = true;
     }
-    const video = videoRef.current;
-    if (video.srcObject) {
-      (video.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
+    const v = videoRef.current;
+    if (v.srcObject) {
+      (v.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
     }
-    const { width: pw, height: ph } = ntsc.processSize.current;
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        width: { ideal: pw || 640 },
-        height: { ideal: ph || 480 },
-        facingMode: facing,
-      },
+      video: { facingMode: facing },
       audio: false,
     });
-    video.srcObject = stream;
-    await video.play();
+    v.srcObject = stream;
+    await v.play();
     setCameraReady(true);
+    setCameraError(null);
   }, []);
 
-  // After WASM is ready, start the camera
   useEffect(() => {
-    if (!ntsc.loading && !ntsc.error) {
-      startCamera(facingRef.current).catch((e) =>
-        console.error("Camera error:", e),
-      );
+    if (ready) {
+      startCamera(facingRef.current).catch((e) => {
+        setCameraError(e instanceof Error ? e.message : String(e));
+      });
     }
-  }, [ntsc.loading, ntsc.error, startCamera]);
+  }, [ready, startCamera]);
 
-  // Start video loop when camera is ready
   useEffect(() => {
-    if (cameraReady && !ntsc.loading && videoRef.current) {
-      ntsc.startVideoLoop(videoRef.current);
-      return () => ntsc.stopLoop();
+    if (cameraReady && pipeline && videoRef.current) {
+      pipeline.startVideo(videoRef.current);
+      return () => pipeline.stopVideo();
     }
-  }, [cameraReady, ntsc.loading, ntsc.startVideoLoop, ntsc.stopLoop]);
+  }, [cameraReady, pipeline]);
 
-  // Cleanup camera on unmount
   useEffect(() => {
     return () => {
       if (videoRef.current?.srcObject) {
@@ -77,7 +89,8 @@ export function CameraPage() {
     }
   };
 
-  if (ntsc.error) {
+  const fatalError = pipelineError ?? cameraError;
+  if (fatalError) {
     return (
       <div
         style={{
@@ -90,7 +103,7 @@ export function CameraPage() {
         }}
       >
         <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 14 }}>
-          {ntsc.error}
+          {pipelineError ? `Pipeline: ${pipelineError}` : `Camera: ${cameraError}`}
         </div>
         <Link to="/" style={{ color: "rgba(255,255,255,0.7)", fontSize: 14 }}>
           Back
@@ -101,11 +114,9 @@ export function CameraPage() {
 
   return (
     <div style={{ width: "100%", height: "100%", position: "relative" }}>
-      {/* Canvas — always mounted */}
-      <NtscCanvas onReady={ntsc.init} />
+      <NtscCanvas canvasRef={canvasRef} />
 
-      {/* Loading overlay */}
-      {ntsc.loading && (
+      {!ready && (
         <div
           style={{
             position: "fixed",
@@ -118,12 +129,11 @@ export function CameraPage() {
           }}
         >
           <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 14 }}>
-            {ntsc.loadingText}
+            Loading...
           </div>
         </div>
       )}
 
-      {/* Top bar */}
       <div
         style={{
           position: "fixed",
@@ -164,11 +174,10 @@ export function CameraPage() {
             borderRadius: 8,
           }}
         >
-          {ntsc.fps > 0 ? `${ntsc.fps} fps` : ""}
+          {fps > 0 ? `${fps} fps` : ""}
         </span>
       </div>
 
-      {/* Bottom buttons */}
       <button
         onClick={handleFlip}
         title="Flip Camera"
@@ -222,7 +231,6 @@ export function CameraPage() {
         &#x2699;
       </button>
 
-      {/* Settings Drawer */}
       <Drawer
         id="camera-settings"
         config={{
@@ -261,10 +269,10 @@ export function CameraPage() {
             }}
           />
           <SettingsPanel
-            params={ntsc.params}
-            activePreset={ntsc.activePreset}
-            onParamChange={ntsc.setParam}
-            onPresetChange={ntsc.applyPreset}
+            params={paramValues}
+            activePreset={activePreset}
+            onParamChange={params.set}
+            onPresetChange={params.applyPreset}
           />
         </div>
       </Drawer>

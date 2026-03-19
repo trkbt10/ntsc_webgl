@@ -1,6 +1,8 @@
+import type { Dispatch, SetStateAction } from "react";
 import type { NtscParam } from "../lib/ntsc-wasm";
 
 export type Preset = Record<string, number | boolean>;
+export type ParamState = Preset;
 
 export const PRESETS: Record<string, Preset> = {
   broadcast: {
@@ -64,6 +66,36 @@ export const PRESETS: Record<string, Preset> = {
     vhs_edge_wave: 0,
   },
 };
+
+export const DEFAULT_PRESET_NAME = Object.keys(PRESETS)[0];
+export const DEFAULT_PARAMS: ParamState = { ...PRESETS[DEFAULT_PRESET_NAME] };
+
+interface ParamTarget {
+  setParam(name: string, value: number | boolean): void;
+  applyParams(params: Record<string, number | boolean>): void;
+}
+
+export function createParamHandlers(
+  target: ParamTarget | null,
+  setValues: Dispatch<SetStateAction<ParamState>>,
+  setActivePreset: Dispatch<SetStateAction<string>>,
+) {
+  return {
+    set(name: string, value: number | boolean) {
+      if (!target) return;
+      target.setParam(name, value);
+      setValues((prev) => ({ ...prev, [name]: value }));
+      setActivePreset("");
+    },
+    applyPreset(name: string) {
+      const preset = PRESETS[name];
+      if (!target || !preset) return;
+      target.applyParams(preset);
+      setValues({ ...preset });
+      setActivePreset(name);
+    },
+  };
+}
 
 /** Slider value scaling (UI <-> WASM param) */
 const SCALED_PARAMS: Record<string, number> = {

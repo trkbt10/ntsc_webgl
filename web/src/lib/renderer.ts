@@ -1,10 +1,21 @@
-/** Opaque handle for the WebGL renderer. */
+interface ViewportCache {
+  canvasW: number;
+  canvasH: number;
+  frameW: number;
+  frameH: number;
+  vx: number;
+  vy: number;
+  vw: number;
+  vh: number;
+}
+
 export interface RendererHandle {
   readonly gl: WebGLRenderingContext;
   readonly texture: WebGLTexture;
+  /** @internal cached viewport geometry */
+  _vp: ViewportCache | null;
 }
 
-/** Set up a WebGL fullscreen-quad renderer on the given canvas. */
 export function createRenderer(
   canvas: HTMLCanvasElement,
 ): RendererHandle | null {
@@ -60,10 +71,23 @@ export function createRenderer(
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-  return { gl, texture };
+  return { gl, texture, _vp: null };
 }
 
-/** Upload RGBA pixels and draw the fullscreen quad. */
+/** Sync the canvas backing buffer to match its CSS display size at device pixel ratio. */
+export function syncCanvasSize(handle: RendererHandle): void {
+  const canvas = handle.gl.canvas as HTMLCanvasElement;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.round((canvas.clientWidth || window.innerWidth) * dpr);
+  const h = Math.round((canvas.clientHeight || window.innerHeight) * dpr);
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+    handle._vp = null;
+  }
+}
+
+/** Upload RGBA pixels and draw the fullscreen quad, letterboxing to preserve aspect ratio. */
 export function drawFrame(
   handle: RendererHandle,
   width: number,
@@ -71,7 +95,37 @@ export function drawFrame(
   pixels: Uint8Array,
 ): void {
   const { gl, texture } = handle;
-  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+  const cw = gl.canvas.width;
+  const ch = gl.canvas.height;
+
+  let vp = handle._vp;
+  if (
+    !vp ||
+    vp.canvasW !== cw ||
+    vp.canvasH !== ch ||
+    vp.frameW !== width ||
+    vp.frameH !== height
+  ) {
+    const scale = Math.min(cw / width, ch / height);
+    const vw = Math.round(width * scale);
+    const vh = Math.round(height * scale);
+    vp = {
+      canvasW: cw,
+      canvasH: ch,
+      frameW: width,
+      frameH: height,
+      vx: Math.round((cw - vw) / 2),
+      vy: Math.round((ch - vh) / 2),
+      vw,
+      vh,
+    };
+    handle._vp = vp;
+  }
+
+  gl.clearColor(0, 0, 0, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.viewport(vp.vx, vp.vy, vp.vw, vp.vh);
+
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.texImage2D(
     gl.TEXTURE_2D,

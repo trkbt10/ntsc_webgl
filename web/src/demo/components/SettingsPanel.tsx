@@ -1,4 +1,4 @@
-import type { ParamState } from "../hooks/useNtsc";
+import type { ParamState } from "../presets";
 import {
   RANGE_PARAMS,
   CHECKBOX_PARAMS,

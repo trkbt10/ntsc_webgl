@@ -1,3 +1,11 @@
+export { NtscEffect } from "./ntsc-effect";
+export { FrameLoop } from "./frame-loop";
+export {
+  createRenderer,
+  syncCanvasSize,
+  drawFrame,
+  type RendererHandle,
+} from "./renderer";
 export {
   loadNtsc,
   initNtsc,

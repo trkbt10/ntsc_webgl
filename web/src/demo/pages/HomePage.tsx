@@ -1,34 +1,40 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Link } from "react-router";
 import { Drawer } from "react-panel-layout";
 import { NtscCanvas } from "../components/NtscCanvas";
 import { SettingsPanel } from "../components/SettingsPanel";
-import { useNtsc } from "../hooks/useNtsc";
+import { useNtscPipeline } from "../hooks/useNtscPipeline";
+import {
+  DEFAULT_PARAMS,
+  DEFAULT_PRESET_NAME,
+  createParamHandlers,
+  type ParamState,
+} from "../presets";
 
 export function HomePage() {
-  const ntsc = useNtsc();
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const imageRef = useRef<HTMLImageElement | null>(null);
+  const { canvasRef, pipeline, ready, error, hasStill } = useNtscPipeline();
 
-  const reprocess = useCallback(() => {
-    if (imageRef.current) {
-      ntsc.processImageSource(imageRef.current);
-    }
-  }, [ntsc.processImageSource]);
+  const [paramValues, setParamValues] = useState<ParamState>(DEFAULT_PARAMS);
+  const [activePreset, setActivePreset] = useState(DEFAULT_PRESET_NAME);
+  const params = useMemo(
+    () => createParamHandlers(pipeline, setParamValues, setActivePreset),
+    [pipeline],
+  );
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    if (pipeline) params.applyPreset(DEFAULT_PRESET_NAME);
+  }, [pipeline]);
 
   const handleFileSelect = useCallback(
     (file: File) => {
       const url = URL.createObjectURL(file);
       const img = new Image();
-      img.onload = () => {
-        imageRef.current = img;
-        setImageLoaded(true);
-        ntsc.processImageSource(img);
-      };
+      img.onload = () => pipeline?.processStill(img);
       img.src = url;
     },
-    [ntsc.processImageSource],
+    [pipeline],
   );
 
   const handleDrop = useCallback(
@@ -42,22 +48,7 @@ export function HomePage() {
     [handleFileSelect],
   );
 
-  // Re-process whenever params change
-  useEffect(() => {
-    if (imageLoaded) {
-      reprocess();
-    }
-  }, [ntsc.params, imageLoaded, reprocess]);
-
-  // Re-process on canvas resize
-  useEffect(() => {
-    if (imageLoaded) {
-      ntsc.setOnResize(reprocess);
-      return () => ntsc.setOnResize(null);
-    }
-  }, [imageLoaded, reprocess, ntsc.setOnResize]);
-
-  if (ntsc.error) {
+  if (error) {
     return (
       <div
         style={{
@@ -68,7 +59,7 @@ export function HomePage() {
         }}
       >
         <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 14 }}>
-          {ntsc.error}
+          {error}
         </div>
       </div>
     );
@@ -76,19 +67,17 @@ export function HomePage() {
 
   return (
     <div style={{ width: "100%", height: "100%", position: "relative" }}>
-      {/* Canvas — always mounted, hidden until image loaded */}
       <NtscCanvas
-        onReady={ntsc.init}
+        canvasRef={canvasRef}
         style={{
           position: "absolute",
           inset: 0,
-          opacity: imageLoaded ? 1 : 0,
+          opacity: hasStill ? 1 : 0,
           pointerEvents: "none",
         }}
       />
 
-      {/* Loading overlay */}
-      {ntsc.loading && (
+      {!ready && (
         <div
           style={{
             position: "fixed",
@@ -101,13 +90,12 @@ export function HomePage() {
           }}
         >
           <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 14 }}>
-            {ntsc.loadingText}
+            Loading...
           </div>
         </div>
       )}
 
-      {/* Upload area — visible when no image */}
-      {!imageLoaded && !ntsc.loading && (
+      {!hasStill && ready && (
         <div
           style={{
             position: "relative",
@@ -205,10 +193,8 @@ export function HomePage() {
         </div>
       )}
 
-      {/* Image preview controls */}
-      {imageLoaded && (
+      {hasStill && (
         <>
-          {/* Top bar */}
           <div
             style={{
               position: "fixed",
@@ -225,10 +211,7 @@ export function HomePage() {
             }}
           >
             <button
-              onClick={() => {
-                setImageLoaded(false);
-                imageRef.current = null;
-              }}
+              onClick={() => pipeline?.clearStill()}
               style={{
                 pointerEvents: "auto",
                 fontSize: 12,
@@ -244,7 +227,6 @@ export function HomePage() {
             </button>
           </div>
 
-          {/* Settings button */}
           <button
             onClick={() => setSettingsOpen((prev) => !prev)}
             title="Settings"
@@ -273,7 +255,6 @@ export function HomePage() {
             &#x2699;
           </button>
 
-          {/* Settings Drawer */}
           <Drawer
             id="home-settings"
             config={{
@@ -312,10 +293,10 @@ export function HomePage() {
                 }}
               />
               <SettingsPanel
-                params={ntsc.params}
-                activePreset={ntsc.activePreset}
-                onParamChange={ntsc.setParam}
-                onPresetChange={ntsc.applyPreset}
+                params={paramValues}
+                activePreset={activePreset}
+                onParamChange={params.set}
+                onPresetChange={params.applyPreset}
               />
             </div>
           </Drawer>
