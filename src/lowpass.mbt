@@ -123,7 +123,8 @@ pub fn lowpass_alpha(rate : Double, hz : Double) -> Double {
 ///|
 /// Apply 3-stage cascade lowpass filter inline (no LowpassFilter struct allocation per row).
 /// Reads from src[src_off..src_off+len], writes final result to dst[dst_off..dst_off+len].
-/// Uses a Double temp buffer to avoid Int<->Double conversions between stages.
+/// IMPORTANT: src[src_off..] is overwritten with pass-2 intermediate during processing.
+/// If you need the original src data after calling this, save it first.
 pub fn lowpass_cascade3(
   src : FixedArray[Int],
   src_off : Int,
@@ -131,24 +132,25 @@ pub fn lowpass_cascade3(
   dst_off : Int,
   len : Int,
   alpha : Double,
+  reset~ : Double = 0.0,
 ) -> Unit {
   let one_minus_alpha = 1.0 - alpha
-  // Pass 1: Int src -> Double (stored back in dst as Int for now)
-  let mut prev = 0.0
+  // Pass 1: src -> dst
+  let mut prev = reset
   for i in 0..<len {
     let sample = src[src_off + i].to_double()
     prev = sample * alpha + prev * one_minus_alpha
     dst[dst_off + i] = prev.to_int()
   }
-  // Pass 2: dst (Int) -> src (Int)
-  prev = 0.0
+  // Pass 2: dst -> src (OVERWRITES src!)
+  prev = reset
   for i in 0..<len {
     let sample = dst[dst_off + i].to_double()
     prev = sample * alpha + prev * one_minus_alpha
     src[src_off + i] = prev.to_int()
   }
   // Pass 3: src -> dst
-  prev = 0.0
+  prev = reset
   for i in 0..<len {
     let sample = src[src_off + i].to_double()
     prev = sample * alpha + prev * one_minus_alpha

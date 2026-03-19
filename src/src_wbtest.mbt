@@ -49,6 +49,88 @@ test "RGB-YIQ round trip" {
 }
 
 ///|
+test "RGB-YIQ round trip - all primary colors" {
+  let width = 8
+  let height = 2
+  let rgba = FixedArray::make(width * height * 4, b'\x00')
+  // Set up 8 test colors: black, red, green, blue, cyan, magenta, yellow, white
+  let colors : Array[(Byte, Byte, Byte)] = [
+    (b'\x00', b'\x00', b'\x00'),
+    (b'\xFF', b'\x00', b'\x00'),
+    (b'\x00', b'\xFF', b'\x00'),
+    (b'\x00', b'\x00', b'\xFF'),
+    (b'\x00', b'\xFF', b'\xFF'),
+    (b'\xFF', b'\x00', b'\xFF'),
+    (b'\xFF', b'\xFF', b'\x00'),
+    (b'\xFF', b'\xFF', b'\xFF'),
+  ]
+  for i in 0..<8 {
+    let (r, g, b) = colors[i]
+    // Row 0
+    rgba[i * 4] = r
+    rgba[i * 4 + 1] = g
+    rgba[i * 4 + 2] = b
+    rgba[i * 4 + 3] = b'\xFF'
+    // Row 1 (same)
+    rgba[(width + i) * 4] = r
+    rgba[(width + i) * 4 + 1] = g
+    rgba[(width + i) * 4 + 2] = b
+    rgba[(width + i) * 4 + 3] = b'\xFF'
+  }
+  let yiq = YiqFrame::new(width, height)
+  rgba2yiq(rgba, width, height, yiq)
+  let out = FixedArray::make(width * height * 4, b'\x00')
+  yiq2rgba(yiq, 0, out)
+  yiq2rgba(yiq, 1, out)
+  let mut max_diff = 0
+  for i in 0..<(width * height * 4) {
+    let diff = (rgba[i].to_int() - out[i].to_int()).abs()
+    if diff > max_diff {
+      max_diff = diff
+    }
+  }
+  // Round trip should be within ±2 for all primary colors
+  assert_true(max_diff <= 2)
+}
+
+///|
+test "full pipeline no purple - gray input" {
+  let width = 32
+  let height = 16
+  let rgba_in = FixedArray::make(width * height * 4, b'\x80')
+  for i in 0..<(width * height) {
+    rgba_in[i * 4 + 3] = b'\xFF'
+  }
+  let rgba_out = FixedArray::make(width * height * 4, b'\x00')
+  rgba_in.blit_to(rgba_out, len=rgba_in.length())
+  let config = NtscConfig::new()
+  let proc = NtscProcessor::new(config)
+  proc.process_frame(rgba_in, width, height, rgba_out)
+  // Check center region (avoid edges affected by filters)
+  for row in 2..<(height - 2) {
+    for col in 4..<(width - 4) {
+      let idx = (row * width + col) * 4
+      let r = rgba_out[idx].to_int()
+      let g = rgba_out[idx + 1].to_int()
+      let b = rgba_out[idx + 2].to_int()
+      // Gray input should produce roughly gray output
+      // No channel should dominate excessively (no purple = no high R+B with low G)
+      let rg = (r - g).abs()
+      let rb = (r - b).abs()
+      let gb = (g - b).abs()
+      let max_channel_diff = if rg > rb {
+        if rg > gb { rg } else { gb }
+      } else if rb > gb {
+        rb
+      } else {
+        gb
+      }
+      assert_true(max_channel_diff < 40)
+    }
+  }
+}
+
+///|
 test "LowpassFilter basic" {
   let lp = LowpassFilter::new(14318181.0, 1300000.0)
   let v1 = lp.lowpass(0.0)

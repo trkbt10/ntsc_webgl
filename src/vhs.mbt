@@ -14,10 +14,8 @@ pub fn vhs_luma_lowpass(
   let alpha = lowpass_alpha(rate, luma_cut)
   for row = field; row < height; row = row + 2 {
     let y_off = row * width
-    lowpass_cascade3(data, y_off, tmp, 0, width, alpha)
-    for x in 0..<width {
-      data[y_off + x] = tmp[x]
-    }
+    lowpass_cascade3(data, y_off, tmp, 0, width, alpha, reset=16.0)
+    // tmp now has 3-stage result; data[y_off..] has pass-2 intermediate (don't use it)
     let pre = LowpassFilter::new(rate, luma_cut, value=16.0)
     pre.highpass_array(tmp, 0, hp_buf, 0, width)
     for x in 0..<width {
@@ -101,13 +99,18 @@ pub fn vhs_sharpen(
   let height = yiq.height
   let data = yiq.data
   let tmp = FixedArray::make(width, 0)
+  // Save original data since lowpass_cascade3 overwrites src
+  let orig = FixedArray::make(width, 0)
   let alpha = lowpass_alpha(rate, luma_cut * 4.0)
   let sharpen2 = sharpen * 2.0
   for row = field; row < height; row = row + 2 {
     let y_off = row * width
+    // Save original before cascade overwrites it
+    FixedArray::unsafe_blit(orig, 0, data, y_off, width)
     lowpass_cascade3(data, y_off, tmp, 0, width, alpha)
+    // tmp = 3-stage lowpass result; orig = original data
     for x in 0..<width {
-      let s = data[y_off + x].to_double()
+      let s = orig[x].to_double()
       let ts = tmp[x].to_double()
       data[y_off + x] = (s + (s - ts) * sharpen2).to_int()
     }

@@ -60,14 +60,18 @@ pub fn composite_lowpass_tv(
     let off = hw + row * width
     lowpass_cascade3(data, off, tmp, 0, width, alpha)
     FixedArray::unsafe_blit(data, off, tmp, shift, width - shift)
-    data[off + width - 1] = 0
+    for x in (width - shift)..<width {
+      data[off + x] = 0
+    }
   }
   // Process Q channel
   for row = field; row < height; row = row + 2 {
     let off = hw + hw + row * width
     lowpass_cascade3(data, off, tmp, 0, width, alpha)
     FixedArray::unsafe_blit(data, off, tmp, shift, width - shift)
-    data[off + width - 1] = 0
+    for x in (width - shift)..<width {
+      data[off + x] = 0
+    }
   }
 }
 
