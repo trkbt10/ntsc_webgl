@@ -16,6 +16,12 @@ export { SafeAreaGuide } from "./SafeAreaGuide";
 export { ScaleBar } from "./ScaleBar";
 
 // Shared UI controls
+export { ControlButton } from "./ControlButton";
 export { FlipCameraButton } from "./FlipCameraButton";
 export { RecordButton } from "./RecordButton";
+export { ModeToggle } from "./ModeToggle";
+export { ShutterButton } from "./ShutterButton";
+export { GalleryButton } from "./GalleryButton";
+export { BackButton } from "./BackButton";
+export { HardwareButton } from "./HardwareButton";
 

@@ -1,28 +1,17 @@
-/**
- * @source useCamera.flipCamera — toggles getUserMedia facingMode
- * @description Camera front/back toggle button. Shared between CameraPage and VideoCamPage.
- */
+import { SwitchCamera } from "lucide-react";
+import { ControlButton } from "./ControlButton";
+import { CONTROL } from "../../design-tokens";
 
 interface FlipCameraButtonProps {
   onFlip: () => void;
   size?: number;
 }
 
-export function FlipCameraButton({ onFlip, size = 42 }: FlipCameraButtonProps) {
+export function FlipCameraButton({ onFlip, size = CONTROL.secondary.size }: FlipCameraButtonProps) {
+  const iconSize = Math.round(size * CONTROL.secondary.iconScale);
   return (
-    <button
-      onClick={onFlip}
-      title="Flip Camera"
-      style={{
-        width: size, height: size, borderRadius: "50%",
-        border: "1.5px solid rgba(255,255,255,0.25)",
-        background: "rgba(0,0,0,0.4)",
-        color: "#fff", fontSize: size * 0.43,
-        cursor: "pointer",
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}
-    >
-      &#x21C4;
-    </button>
+    <ControlButton onClick={onFlip} size={size} title="Flip Camera">
+      <SwitchCamera size={iconSize} strokeWidth={CONTROL.iconStroke} />
+    </ControlButton>
   );
 }

@@ -5,7 +5,7 @@
  */
 import { useState, useEffect } from "react";
 
-export function RecIndicator({ recording = false }: { recording?: boolean }) {
+export function RecIndicator({ recording = false, photoMode = false }: { recording?: boolean; photoMode?: boolean }) {
   const [visible, setVisible] = useState(true);
   useEffect(() => {
     if (!recording) { setVisible(true); return; }
@@ -32,7 +32,7 @@ export function RecIndicator({ recording = false }: { recording?: boolean }) {
           textShadow: "0 1px 3px rgba(0,0,0,0.8)",
         }}
       >
-        {recording ? "REC" : "STBY"}
+        {photoMode ? "PHOTO" : recording ? "REC" : "STBY"}
       </span>
     </div>
   );

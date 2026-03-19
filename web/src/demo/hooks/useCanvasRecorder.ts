@@ -31,10 +31,17 @@ function pickMimeType(): string {
   return "video/webm";
 }
 
-export function useCanvasRecorder(canvas: HTMLCanvasElement | null) {
+export interface CanvasRecorderOptions {
+  onComplete?: (blob: Blob, mimeType: string) => void;
+}
+
+export function useCanvasRecorder(canvas: HTMLCanvasElement | null, options?: CanvasRecorderOptions) {
   const [recording, setRecording] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const startTimeRef = useRef<number>(0);
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
   const start = useCallback(() => {
     if (!canvas || !canRecord()) return;
@@ -42,29 +49,36 @@ export function useCanvasRecorder(canvas: HTMLCanvasElement | null) {
     const mimeType = pickMimeType();
     const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000 });
     chunksRef.current = [];
+    startTimeRef.current = Date.now();
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
     };
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: mimeType });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `ntsc-recording-${Date.now()}.webm`;
-      a.click();
-      URL.revokeObjectURL(url);
+      if (optionsRef.current?.onComplete) {
+        optionsRef.current.onComplete(blob, mimeType);
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `ntsc-recording-${Date.now()}.webm`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
     };
-    recorder.start(1000); // collect data every second
+    recorder.start(1000);
     recorderRef.current = recorder;
     setRecording(true);
   }, [canvas]);
 
   const stop = useCallback(() => {
+    const duration = Date.now() - startTimeRef.current;
     if (recorderRef.current && recorderRef.current.state !== "inactive") {
       recorderRef.current.stop();
     }
     recorderRef.current = null;
     setRecording(false);
+    return duration;
   }, []);
 
   const toggle = useCallback(() => {
@@ -72,5 +86,5 @@ export function useCanvasRecorder(canvas: HTMLCanvasElement | null) {
     else start();
   }, [recording, start, stop]);
 
-  return { recording, toggle, canRecord: canRecord() };
+  return { recording, toggle, stop, canRecord: canRecord() };
 }

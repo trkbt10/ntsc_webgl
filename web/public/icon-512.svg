@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#000"/>
+  <g transform="translate(256, 256)">
+    <circle r="163.84" fill="none" stroke="#e00" stroke-width="20.48"/>
+    <circle r="61.44" fill="#e00"/>
+    <text y="143.36" text-anchor="middle" fill="#888" font-family="monospace" font-size="40.96" font-weight="bold">NTSC</text>
+  </g>
+</svg>

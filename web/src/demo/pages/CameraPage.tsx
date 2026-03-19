@@ -63,6 +63,12 @@ export function CameraPage() {
         onFlipCamera={flipCamera}
         onToggleRecord={() => {}}
         orientation={orientation}
+        captureMode="video"
+        onToggleMode={() => {}}
+        onCapturePhoto={() => {}}
+        galleryThumbnail={null}
+        galleryCount={0}
+        onOpenGallery={() => {}}
       />
 
       {!ready && (

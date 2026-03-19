@@ -17,6 +17,7 @@ import {
   type CamcorderDisplayState,
 } from "../camcorder-settings";
 import { type ParamState } from "../presets";
+import { HARDWARE_BUTTON, HARDWARE_BUTTON_ACTIVE } from "../design-tokens";
 
 /* ── Retro MENU button ── */
 function MenuButton({ onClick, active }: { onClick: () => void; active: boolean }) {
@@ -24,19 +25,8 @@ function MenuButton({ onClick, active }: { onClick: () => void; active: boolean 
     <button
       onClick={onClick}
       style={{
-        padding: "5px 14px", fontSize: 13, fontWeight: 800,
-        fontFamily: "'Arial Black', 'Helvetica Neue', sans-serif",
-        letterSpacing: 2, color: "#fff",
-        textShadow: "0 1px 2px rgba(0,0,0,0.8)",
-        background: active
-          ? "linear-gradient(180deg, #666 0%, #333 50%, #555 100%)"
-          : "linear-gradient(180deg, #555 0%, #222 50%, #444 100%)",
-        border: "2px solid rgba(255,255,255,0.35)",
-        borderRadius: 6,
-        boxShadow: active
-          ? "inset 0 1px 3px rgba(0,0,0,0.5)"
-          : "0 2px 6px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.15)",
-        cursor: "pointer", userSelect: "none",
+        ...(active ? HARDWARE_BUTTON_ACTIVE : HARDWARE_BUTTON),
+        padding: "5px 14px", fontSize: 13,
       }}
     >
       MENU

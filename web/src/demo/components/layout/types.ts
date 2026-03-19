@@ -1,4 +1,5 @@
 import type { CamcorderDisplayState } from "../../camcorder-settings";
+import type { CaptureMode } from "../../media-store-types";
 
 /** All data sources + callbacks that a layout preset receives */
 export type Orientation = "portrait" | "landscape";
@@ -17,6 +18,12 @@ export interface LayoutProps {
   onToggleRecord: () => void;
   camcorderState?: CamcorderDisplayState;
   orientation: Orientation;
+  captureMode: CaptureMode;
+  onToggleMode: () => void;
+  onCapturePhoto: () => void;
+  galleryThumbnail: string | null;
+  galleryCount: number;
+  onOpenGallery: () => void;
 }
 
 /** Convenience: extract common display toggles from camcorderState */

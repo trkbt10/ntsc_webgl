@@ -1,9 +1,5 @@
-/**
- * @source useCanvasRecorder — MediaRecorder via canvas.captureStream()
- * @support Chrome/Firefox: yes | Safari/iOS: no (button hidden when unsupported)
- * @description Record/stop button for NTSC-processed canvas output.
- *   Only rendered when MediaRecorder is supported.
- */
+import { ControlButton } from "./ControlButton";
+import { CONTROL, COLOR } from "../../design-tokens";
 
 interface RecordButtonProps {
   recording: boolean;
@@ -12,31 +8,20 @@ interface RecordButtonProps {
   size?: number;
 }
 
-export function RecordButton({ recording, onToggle, supported, size = 56 }: RecordButtonProps) {
+export function RecordButton({ recording, onToggle, supported, size = CONTROL.primary.size }: RecordButtonProps) {
   if (!supported) return null;
 
   const innerSize = recording ? size * 0.39 : size * 0.75;
   return (
-    <button
-      onClick={onToggle}
-      title={recording ? "Stop & Save" : "Record"}
-      style={{
-        width: size, height: size, borderRadius: "50%",
-        border: "3px solid rgba(255,255,255,0.6)",
-        background: "transparent",
-        cursor: "pointer",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 0,
-      }}
-    >
+    <ControlButton onClick={onToggle} size={size} variant="primary" title={recording ? "Stop & Save" : "Record"}>
       <div
         style={{
           width: innerSize, height: innerSize,
           borderRadius: recording ? 4 : "50%",
-          background: "#e00",
+          background: COLOR.rec,
           transition: "all 0.2s",
         }}
       />
-    </button>
+    </ControlButton>
   );
 }

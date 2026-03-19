@@ -1,21 +1,21 @@
-import { Link } from "react-router";
 import {
   RecIndicator, Timecode, BatteryIcon, ResolutionBadge,
   AudioLevelMeter, AudioChannel, FpsDisplay, ScaleBar,
   FocusBrackets, Crosshair, ThirdsGrid,
   FlipCameraButton, RecordButton,
+  ModeToggle, ShutterButton, GalleryButton,
 } from "../../viewfinder";
 import { InteractiveWrap } from "../InteractiveWrap";
 import { type LayoutProps, displayToggles } from "../types";
+import { controlSizes, SPACING } from "../../../design-tokens";
 
-/**
- * Professional viewfinder (Image3 + AVIF bottom-left)
- * Landscape: top bar info, right-side meter, bottom data + center controls
- * Portrait: top bar, bottom stacked (data row + controls row), side meter
- */
+const PRESET = "modern";
+
 export function ModernLayout(p: LayoutProps) {
   const { showMeter, showGrid } = displayToggles(p);
   const L = p.orientation === "landscape";
+  const isPhoto = p.captureMode === "photo";
+  const sz = controlSizes(PRESET, p.orientation);
 
   return (
     <>
@@ -24,12 +24,12 @@ export function ModernLayout(p: LayoutProps) {
       <Crosshair />
 
       {/* Top bar */}
-      <div style={{ position: "absolute", top: "2%", left: "3%", right: "3%",
+      <div style={{ position: "absolute", top: "2%", left: SPACING.edgePad, right: SPACING.edgePad,
         display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "2%" }}>
-          <RecIndicator recording={p.recording} />
-          <Timecode recording={p.recording} />
+          <RecIndicator recording={p.recording} photoMode={isPhoto} />
+          {!isPhoto && <Timecode recording={p.recording} />}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "2%" }}>
           <ResolutionBadge width={p.cameraWidth} height={p.cameraHeight} />
@@ -40,13 +40,12 @@ export function ModernLayout(p: LayoutProps) {
       {L ? (
         <>
           {showMeter && (
-            <div style={{ position: "absolute", right: "3%", top: "35%" }}>
+            <div style={{ position: "absolute", right: SPACING.edgePad, top: "35%" }}>
               <AudioLevelMeter audioStream={p.audioStream} />
             </div>
           )}
 
-          {/* Bottom: data left, scale right */}
-          <div style={{ position: "absolute", bottom: "2%", left: "3%", right: "3%",
+          <div style={{ position: "absolute", bottom: "2%", left: SPACING.edgePad, right: SPACING.edgePad,
             display: "flex", alignItems: "flex-end", justifyContent: "space-between",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: "3%" }}>
@@ -56,24 +55,27 @@ export function ModernLayout(p: LayoutProps) {
             <ScaleBar />
           </div>
 
-          {/* Controls: center-bottom */}
           <div style={{ position: "absolute", bottom: "2%", left: 0, right: 0,
-            display: "flex", alignItems: "center", justifyContent: "center", gap: "5%",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: SPACING.controlGap * 2,
           }}>
-            <InteractiveWrap><FlipCameraButton onFlip={p.onFlipCamera} size={36} /></InteractiveWrap>
-            <InteractiveWrap><RecordButton recording={p.recording} onToggle={p.onToggleRecord} supported={p.recordingSupported} size={48} /></InteractiveWrap>
-            <InteractiveWrap><Link to="/" style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", textDecoration: "none" }}>←</Link></InteractiveWrap>
-          </div>
+            <InteractiveWrap><ModeToggle mode={p.captureMode} onToggle={p.onToggleMode} size={sz.secondary} /></InteractiveWrap>
+            <InteractiveWrap><FlipCameraButton onFlip={p.onFlipCamera} size={sz.secondary} /></InteractiveWrap>
+            <InteractiveWrap>
+              {isPhoto
+                ? <ShutterButton onCapture={p.onCapturePhoto} size={sz.primary} />
+                : <RecordButton recording={p.recording} onToggle={p.onToggleRecord} supported={p.recordingSupported} size={sz.primary} />
+              }
+            </InteractiveWrap>
+            <InteractiveWrap><GalleryButton thumbnailUrl={p.galleryThumbnail} count={p.galleryCount} onOpen={p.onOpenGallery} size={sz.secondary} /></InteractiveWrap>          </div>
         </>
       ) : (
         <>
           {showMeter && (
-            <div style={{ position: "absolute", right: "3%", top: "15%" }}>
+            <div style={{ position: "absolute", right: SPACING.edgePad, top: "15%" }}>
               <AudioLevelMeter audioStream={p.audioStream} />
             </div>
           )}
 
-          {/* Bottom: stacked data + controls */}
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "18%",
             display: "flex", flexDirection: "column", justifyContent: "flex-end",
             padding: "0 4% 2%", gap: "1.5%",
@@ -85,11 +87,16 @@ export function ModernLayout(p: LayoutProps) {
               </div>
               <ScaleBar />
             </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6%" }}>
-              <InteractiveWrap><FlipCameraButton onFlip={p.onFlipCamera} size={34} /></InteractiveWrap>
-              <InteractiveWrap><RecordButton recording={p.recording} onToggle={p.onToggleRecord} supported={p.recordingSupported} size={46} /></InteractiveWrap>
-              <InteractiveWrap><Link to="/" style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", textDecoration: "none" }}>←</Link></InteractiveWrap>
-            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: SPACING.controlGap * 2 }}>
+              <InteractiveWrap><ModeToggle mode={p.captureMode} onToggle={p.onToggleMode} size={sz.secondary} /></InteractiveWrap>
+              <InteractiveWrap><FlipCameraButton onFlip={p.onFlipCamera} size={sz.secondary} /></InteractiveWrap>
+              <InteractiveWrap>
+                {isPhoto
+                  ? <ShutterButton onCapture={p.onCapturePhoto} size={sz.primary} />
+                  : <RecordButton recording={p.recording} onToggle={p.onToggleRecord} supported={p.recordingSupported} size={sz.primary} />
+                }
+              </InteractiveWrap>
+              <InteractiveWrap><GalleryButton thumbnailUrl={p.galleryThumbnail} count={p.galleryCount} onOpen={p.onOpenGallery} size={sz.secondary} /></InteractiveWrap>            </div>
           </div>
         </>
       )}

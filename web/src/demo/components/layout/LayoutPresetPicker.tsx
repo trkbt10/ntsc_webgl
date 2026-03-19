@@ -10,6 +10,12 @@ const THUMB_PROPS: LayoutProps = {
   recordingSupported: true,
   onFlipCamera: () => {}, onToggleRecord: () => {},
   orientation: "landscape",
+  captureMode: "video",
+  onToggleMode: () => {},
+  onCapturePhoto: () => {},
+  galleryThumbnail: null,
+  galleryCount: 0,
+  onOpenGallery: () => {},
 };
 
 const THUMB_W = 96;

@@ -17,6 +17,49 @@ input[type="range"]::-webkit-slider-thumb {
   cursor: pointer;
 }
 
+/* ── View Transitions ── */
+
+/* Gallery modal: fade + slide up */
+::view-transition-old(gallery-modal) {
+  animation: 250ms ease-out both vt-fade-out, 250ms ease-out both vt-slide-down;
+}
+::view-transition-new(gallery-modal) {
+  animation: 250ms ease-out both vt-fade-in, 250ms ease-out both vt-slide-up;
+}
+
+/* Preview: crossfade + scale */
+::view-transition-old(gallery-preview) {
+  animation: 200ms ease-out both vt-fade-out, 200ms ease-out both vt-scale-down;
+}
+::view-transition-new(gallery-preview) {
+  animation: 200ms ease-out both vt-fade-in, 200ms ease-out both vt-scale-up;
+}
+
+/* Gallery button thumbnail: morph transition (auto) */
+::view-transition-old(gallery-button),
+::view-transition-new(gallery-button) {
+  animation-duration: 300ms;
+}
+
+@keyframes vt-fade-in {
+  from { opacity: 0; }
+}
+@keyframes vt-fade-out {
+  to { opacity: 0; }
+}
+@keyframes vt-slide-up {
+  from { transform: translateY(30px); }
+}
+@keyframes vt-slide-down {
+  to { transform: translateY(30px); }
+}
+@keyframes vt-scale-up {
+  from { transform: scale(0.92); }
+}
+@keyframes vt-scale-down {
+  to { transform: scale(0.92); }
+}
+
 /* Scrollbar for panels */
 ::-webkit-scrollbar {
   width: 4px;
