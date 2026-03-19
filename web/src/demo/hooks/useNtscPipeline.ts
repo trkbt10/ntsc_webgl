@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
 import { NtscPipeline } from "../../lib/ntsc-pipeline";
-import wasmUrl from "../../../../_build/wasm-gc/debug/build/cmd/wasm/wasm.wasm?url";
 
 export function useNtscPipeline() {
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
@@ -15,20 +14,16 @@ export function useNtscPipeline() {
 
   useEffect(() => {
     if (!canvas) return;
-    let cancelled = false;
     let p: NtscPipeline | null = null;
 
-    (async () => {
-      try {
-        p = await NtscPipeline.create(canvas, wasmUrl);
-        if (!cancelled) setPipeline(p);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-      }
-    })();
+    try {
+      p = NtscPipeline.create(canvas);
+      setPipeline(p);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
 
     return () => {
-      cancelled = true;
       p?.dispose();
     };
   }, [canvas]);

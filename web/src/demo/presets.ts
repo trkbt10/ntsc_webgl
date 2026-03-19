@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { NtscParam } from "../lib/ntsc-wasm";
+import type { NtscParam } from "../lib/ntsc-gl";
 
 export type Preset = Record<string, number | boolean>;
 export type ParamState = Preset;
