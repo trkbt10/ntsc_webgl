@@ -113,21 +113,18 @@ export function setNtscParam(
  * Process one RGBA frame.
  *
  * @param rgbaIn  Input pixel data (width * height * 4 bytes)
- * @param rgbaOut Optional pre-allocated output buffer (same size)
- * @returns       Output pixel data
+ * @param rgbaOut Pre-allocated output buffer (same size as input)
  */
 export function processNtscFrame(
   handle: NtscHandle,
   rgbaIn: Uint8Array,
-  rgbaOut?: Uint8Array,
-): Uint8Array {
+  rgbaOut: Uint8Array,
+): void {
   handle.exports.pushFrame(bytesToLatin1(rgbaIn));
   handle.exports.processFrame();
 
   const outputLen = handle.exports.getOutputLength();
   const outputStr = handle.exports.getOutputChunk(0, outputLen);
-  const out = rgbaOut ?? new Uint8Array(outputLen);
   // latin1 decode: each char code is one byte
-  for (let i = 0; i < outputLen; i++) out[i] = outputStr.charCodeAt(i);
-  return out;
+  for (let i = 0; i < outputLen; i++) rgbaOut[i] = outputStr.charCodeAt(i);
 }

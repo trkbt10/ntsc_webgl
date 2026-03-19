@@ -1,4 +1,3 @@
-export { NtscEffect } from "./ntsc-effect";
 export { FrameLoop } from "./frame-loop";
 export {
   createRenderer,

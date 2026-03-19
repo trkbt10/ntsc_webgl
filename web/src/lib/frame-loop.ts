@@ -6,7 +6,7 @@ export class FrameLoop {
   private count = 0;
   private lastTime = 0;
   private _fps = 0;
-  private callback: (() => void) | null = null;
+  private callback: (() => void | Promise<void>) | null = null;
 
   get fps(): number {
     return this._fps;
@@ -15,7 +15,7 @@ export class FrameLoop {
   /** Called each time the FPS value is updated (~1/s). */
   onFpsUpdate: ((fps: number) => void) | null = null;
 
-  start(callback: () => void): void {
+  start(callback: () => void | Promise<void>): void {
     this.stop();
     this.callback = callback;
     this.count = 0;
