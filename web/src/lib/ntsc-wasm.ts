@@ -49,7 +49,7 @@ export interface NtscHandle {
  */
 const latin1Decoder = new TextDecoder("latin1");
 
-function bytesToLatin1(bytes: Uint8Array): string {
+function bytesToLatin1(bytes: ArrayBufferView): string {
   return latin1Decoder.decode(bytes);
 }
 
@@ -117,7 +117,7 @@ export function setNtscParam(
  */
 export function processNtscFrame(
   handle: NtscHandle,
-  rgbaIn: Uint8Array,
+  rgbaIn: ArrayBufferView,
   rgbaOut: Uint8Array,
 ): void {
   handle.exports.pushFrame(bytesToLatin1(rgbaIn));

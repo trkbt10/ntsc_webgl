@@ -13,6 +13,7 @@ import {
   type RendererHandle,
 } from "./renderer";
 import { FrameLoop } from "./frame-loop";
+import NTSCWorker from './ntsc-worker.ts?worker';
 
 type ImageSource = HTMLImageElement | HTMLCanvasElement;
 
@@ -23,27 +24,41 @@ type ImageSource = HTMLImageElement | HTMLCanvasElement;
  */
 const MAX_DIM = 640;
 
+// ---- Worker message types ----
+
+interface WorkerFrameMsg {
+  type: "frame";
+  pixels: ArrayBuffer;
+  width: number;
+  height: number;
+}
+
 /**
  * Self-contained NTSC processing pipeline.
  *
  * Owns the full lifecycle: WASM handle, pixel capture, WebGL rendering,
  * video loop, still-image management, canvas resize observation.
  *
- * Consumers call methods — the pipeline handles mode switching,
- * reprocessing, and resource management internally.
+ * When possible, heavy work (WASM + pixel capture) runs in a Web Worker;
+ * falls back to inline processing if Worker creation fails.
  */
 export class NtscPipeline {
-  private readonly handle: NtscHandle;
   private readonly renderer: RendererHandle;
-  private readonly captureCanvas = document.createElement("canvas");
-  private readonly captureCtx: CanvasRenderingContext2D;
-  private captureBuffer = new Uint8Array(0);
-  private outputBuffer = new Uint8Array(0);
   private readonly loop = new FrameLoop();
   private readonly resizeObserver: ResizeObserver;
   private stillSource: ImageSource | null = null;
-  private stillBitmap: ImageBitmap | null = null;
   private processSize = { width: 0, height: 0 };
+  private lastFrame: { pixels: Uint8Array; width: number; height: number } | null = null;
+
+  // Worker mode
+  private worker: Worker | null = null;
+  private workerBusy = false;
+
+  // Inline fallback mode
+  private handle: NtscHandle | null = null;
+  private captureCanvas: HTMLCanvasElement | null = null;
+  private captureCtx: CanvasRenderingContext2D | null = null;
+  private outputBuffer = new Uint8Array(0);
 
   /** Fires when FPS measurement updates (~1/s during video mode). */
   onFpsUpdate: ((fps: number) => void) | null = null;
@@ -51,12 +66,8 @@ export class NtscPipeline {
   /** Fires when the still-source presence changes. */
   onStillChange: ((hasStill: boolean) => void) | null = null;
 
-  private constructor(handle: NtscHandle, renderer: RendererHandle) {
-    this.handle = handle;
+  private constructor(renderer: RendererHandle) {
     this.renderer = renderer;
-    this.captureCtx = this.captureCanvas.getContext("2d", {
-      willReadFrequently: true,
-    })!;
 
     this.loop.onFpsUpdate = (fps) => this.onFpsUpdate?.(fps);
 
@@ -68,26 +79,105 @@ export class NtscPipeline {
     canvas: HTMLCanvasElement,
     wasmUrl: string,
   ): Promise<NtscPipeline> {
-    const handle = await loadNtsc(wasmUrl);
     const renderer = createRenderer(canvas);
     if (!renderer) throw new Error("WebGL not supported");
-    return new NtscPipeline(handle, renderer);
+
+    const pipeline = new NtscPipeline(renderer);
+
+    // Try worker mode first
+    try {
+      const worker = new NTSCWorker({
+        name: "NTSC Worker",
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          worker.terminate();
+          reject(new Error("Worker init timeout"));
+        }, 10_000);
+
+        worker.onmessage = (e) => {
+          if (e.data.type === "ready") {
+            clearTimeout(timeout);
+            resolve();
+          } else if (e.data.type === "error") {
+            clearTimeout(timeout);
+            reject(new Error(e.data.message));
+          }
+        };
+        worker.onerror = (e) => {
+          clearTimeout(timeout);
+          reject(e);
+        };
+
+        worker.postMessage({ type: "init", wasmUrl });
+      });
+
+      pipeline.worker = worker;
+      worker.onmessage = (e) => pipeline.handleWorkerMessage(e.data);
+      worker.onerror = null;
+    } catch {
+      // Fallback to inline processing
+      const handle = await loadNtsc(wasmUrl);
+      pipeline.handle = handle;
+      pipeline.captureCanvas = document.createElement("canvas");
+      pipeline.captureCtx = pipeline.captureCanvas.getContext("2d", {
+        willReadFrequently: true,
+      })!;
+    }
+
+    return pipeline;
+  }
+
+  // ---- Worker message handler ----
+
+  private handleWorkerMessage(msg: any): void {
+    if (msg.type === "frame") {
+      const frame = msg as WorkerFrameMsg;
+      const pixels = new Uint8Array(frame.pixels);
+      this.lastFrame = { pixels, width: frame.width, height: frame.height };
+      this.workerBusy = false;
+      syncCanvasSize(this.renderer);
+      drawFrame(this.renderer, frame.width, frame.height, pixels);
+    }
   }
 
   // ---- Video mode ----
 
   startVideo(video: HTMLVideoElement): void {
     this.clearStill();
-    let rendering = false;
-    this.loop.start(async () => {
-      if (rendering) return;
-      rendering = true;
-      try {
-        await this.renderVideo(video);
-      } finally {
-        rendering = false;
-      }
-    });
+
+    if (this.worker) {
+      this.loop.start(async () => {
+        if (this.workerBusy) return;
+        const srcW = video.videoWidth;
+        const srcH = video.videoHeight;
+        if (srcW === 0 || srcH === 0) return;
+
+        const { width, height } = this.calcSize(srcW, srcH);
+        const bitmap = await createImageBitmap(video, {
+          resizeWidth: width,
+          resizeHeight: height,
+        });
+        this.workerBusy = true;
+        this.worker!.postMessage(
+          { type: "processFrame", bitmap, width, height },
+          [bitmap] as any,
+        );
+      });
+    } else {
+      // Inline fallback
+      let rendering = false;
+      this.loop.start(async () => {
+        if (rendering) return;
+        rendering = true;
+        try {
+          await this.renderVideoInline(video);
+        } finally {
+          rendering = false;
+        }
+      });
+    }
   }
 
   stopVideo(): void {
@@ -103,6 +193,7 @@ export class NtscPipeline {
   processStill(source: ImageSource): void {
     this.stopVideo();
     this.stillSource = source;
+    this.lastFrame = null;
     this.onStillChange?.(true);
     this.prepareStillBitmap(source);
   }
@@ -110,9 +201,12 @@ export class NtscPipeline {
   clearStill(): void {
     if (!this.stillSource) return;
     this.stillSource = null;
-    this.stillBitmap?.close();
-    this.stillBitmap = null;
+    this.lastFrame = null;
     this.onStillChange?.(false);
+
+    if (this.worker) {
+      this.worker.postMessage({ type: "clearStill" });
+    }
   }
 
   get hasStill(): boolean {
@@ -123,16 +217,24 @@ export class NtscPipeline {
 
   setParam(name: string, value: number | boolean): void {
     const v = typeof value === "boolean" ? (value ? 1 : 0) : value;
-    setNtscParam(this.handle, name as NtscParam, v);
-    this.redrawStill();
+    if (this.worker) {
+      this.worker.postMessage({ type: "setParam", name, value: v });
+    } else if (this.handle) {
+      setNtscParam(this.handle, name as NtscParam, v);
+      this.redrawStill();
+    }
   }
 
   applyParams(params: Record<string, number | boolean>): void {
-    for (const [key, val] of Object.entries(params)) {
-      const v = typeof val === "boolean" ? (val ? 1 : 0) : val;
-      setNtscParam(this.handle, key as NtscParam, v);
+    if (this.worker) {
+      this.worker.postMessage({ type: "applyParams", params });
+    } else if (this.handle) {
+      for (const [key, val] of Object.entries(params)) {
+        const v = typeof val === "boolean" ? (val ? 1 : 0) : val;
+        setNtscParam(this.handle, key as NtscParam, v);
+      }
+      this.redrawStill();
     }
-    this.redrawStill();
   }
 
   // ---- Lifecycle ----
@@ -140,39 +242,12 @@ export class NtscPipeline {
   dispose(): void {
     this.loop.stop();
     this.resizeObserver.disconnect();
-    this.stillBitmap?.close();
+    this.worker?.terminate();
   }
 
   // ---- Internal ----
 
-  private async prepareStillBitmap(source: ImageSource): Promise<void> {
-    const srcW =
-      source instanceof HTMLImageElement ? source.naturalWidth : source.width;
-    const srcH =
-      source instanceof HTMLImageElement ? source.naturalHeight : source.height;
-    if (srcW === 0 || srcH === 0) return;
-
-    const { width, height } = this.initSize(srcW, srcH);
-    this.stillBitmap?.close();
-    this.stillBitmap = await createImageBitmap(source, {
-      resizeWidth: width,
-      resizeHeight: height,
-    });
-    if (this.stillSource !== source) return;
-    this.renderBitmap(this.stillBitmap, width, height);
-  }
-
-  private redrawStill(): void {
-    if (this.stillBitmap) {
-      this.renderBitmap(
-        this.stillBitmap,
-        this.processSize.width,
-        this.processSize.height,
-      );
-    }
-  }
-
-  private initSize(
+  private calcSize(
     srcW: number,
     srcH: number,
   ): { width: number; height: number } {
@@ -185,55 +260,105 @@ export class NtscPipeline {
     }
     w = w & ~1;
     h = h & ~1;
-    const width = Math.max(w, 2);
-    const height = Math.max(h, 2);
+    return { width: Math.max(w, 2), height: Math.max(h, 2) };
+  }
 
+  private initSizeInline(srcW: number, srcH: number): { width: number; height: number } {
+    const size = this.calcSize(srcW, srcH);
     if (
-      this.processSize.width !== width ||
-      this.processSize.height !== height
+      this.processSize.width !== size.width ||
+      this.processSize.height !== size.height
     ) {
-      this.processSize = { width, height };
-      initNtsc(this.handle, width, height);
+      this.processSize = size;
+      initNtsc(this.handle!, size.width, size.height);
     }
-
     return this.processSize;
   }
 
-  private async renderVideo(video: HTMLVideoElement): Promise<void> {
+  private async prepareStillBitmap(source: ImageSource): Promise<void> {
+    const srcW =
+      source instanceof HTMLImageElement ? source.naturalWidth : source.width;
+    const srcH =
+      source instanceof HTMLImageElement ? source.naturalHeight : source.height;
+    if (srcW === 0 || srcH === 0) return;
+
+    const { width, height } = this.calcSize(srcW, srcH);
+    const bitmap = await createImageBitmap(source, {
+      resizeWidth: width,
+      resizeHeight: height,
+    });
+    if (this.stillSource !== source) {
+      bitmap.close();
+      return;
+    }
+
+    if (this.worker) {
+      this.processSize = { width, height };
+      this.worker.postMessage(
+        { type: "processStill", bitmap, width, height },
+        [bitmap] as any,
+      );
+    } else {
+      this.initSizeInline(srcW, srcH);
+      this.renderBitmapInline(bitmap, width, height);
+      bitmap.close();
+    }
+  }
+
+  private redrawStill(): void {
+    if (this.lastFrame) {
+      syncCanvasSize(this.renderer);
+      drawFrame(
+        this.renderer,
+        this.lastFrame.width,
+        this.lastFrame.height,
+        this.lastFrame.pixels,
+      );
+    }
+  }
+
+  // ---- Inline fallback methods ----
+
+  private async renderVideoInline(video: HTMLVideoElement): Promise<void> {
     const srcW = video.videoWidth;
     const srcH = video.videoHeight;
     if (srcW === 0 || srcH === 0) return;
 
-    const { width, height } = this.initSize(srcW, srcH);
+    const { width, height } = this.initSizeInline(srcW, srcH);
     const bitmap = await createImageBitmap(video, {
       resizeWidth: width,
       resizeHeight: height,
     });
-    this.renderBitmap(bitmap, width, height);
+    this.renderBitmapInline(bitmap, width, height);
     bitmap.close();
   }
 
-  /** Render a pre-scaled ImageBitmap (1:1 draw, no scaling). */
-  private renderBitmap(
+  private renderBitmapInline(
     bitmap: ImageBitmap,
     width: number,
     height: number,
   ): void {
     syncCanvasSize(this.renderer);
 
-    if (this.captureCanvas.width !== width) this.captureCanvas.width = width;
-    if (this.captureCanvas.height !== height)
-      this.captureCanvas.height = height;
-    this.captureCtx.drawImage(bitmap, 0, 0);
-    const imageData = this.captureCtx.getImageData(0, 0, width, height);
+    const cc = this.captureCanvas!;
+    if (cc.width !== width) cc.width = width;
+    if (cc.height !== height) cc.height = height;
+    this.captureCtx!.drawImage(bitmap, 0, 0);
+    const imageData = this.captureCtx!.getImageData(0, 0, width, height);
+
     const size = width * height * 4;
-    if (this.captureBuffer.length !== size) {
-      this.captureBuffer = new Uint8Array(size);
+    if (this.outputBuffer.length !== size) {
       this.outputBuffer = new Uint8Array(size);
     }
-    this.captureBuffer.set(imageData.data);
 
-    processNtscFrame(this.handle, this.captureBuffer, this.outputBuffer);
+    // Pass imageData.data directly — no intermediate captureBuffer copy
+    processNtscFrame(this.handle!, imageData.data, this.outputBuffer);
+
+    this.lastFrame = {
+      pixels: new Uint8Array(this.outputBuffer),
+      width,
+      height,
+    };
     drawFrame(this.renderer, width, height, this.outputBuffer);
   }
 }
