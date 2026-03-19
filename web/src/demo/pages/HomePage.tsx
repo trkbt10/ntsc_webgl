@@ -161,24 +161,44 @@ export function HomePage() {
             or drag & drop an image
           </div>
 
-          <Link
-            to="/camera"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "12px 28px",
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.15)",
-              background: "transparent",
-              color: "rgba(255,255,255,0.7)",
-              fontSize: 15,
-              textDecoration: "none",
-              transition: "background 0.2s",
-            }}
-          >
-            Live Camera Mode
-          </Link>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+            <Link
+              to="/camera"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "12px 28px",
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,0.15)",
+                background: "transparent",
+                color: "rgba(255,255,255,0.7)",
+                fontSize: 15,
+                textDecoration: "none",
+                transition: "background 0.2s",
+              }}
+            >
+              Live Camera
+            </Link>
+            <Link
+              to="/video-cam"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "12px 28px",
+                borderRadius: 12,
+                border: "1px solid rgba(255,200,0,0.3)",
+                background: "rgba(255,200,0,0.08)",
+                color: "rgba(255,220,100,0.9)",
+                fontSize: 15,
+                textDecoration: "none",
+                transition: "background 0.2s",
+              }}
+            >
+              Video Cam
+            </Link>
+          </div>
           <div
             style={{
               fontSize: 11,
@@ -188,7 +208,7 @@ export function HomePage() {
               lineHeight: 1.5,
             }}
           >
-            Camera mode will request access to your device camera
+            Camera modes will request access to your device camera
           </div>
         </div>
       )}
