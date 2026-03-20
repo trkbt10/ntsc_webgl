@@ -17,7 +17,7 @@ import {
   type CamcorderDisplayState,
 } from "../camcorder-settings";
 import { type ParamState } from "../presets";
-import { HARDWARE_BUTTON, HARDWARE_BUTTON_ACTIVE } from "../design-tokens";
+import { HARDWARE_BUTTON, HARDWARE_BUTTON_ACTIVE, Z } from "../design-tokens";
 
 /* ── Retro MENU button ── */
 function MenuButton({ onClick, active }: { onClick: () => void; active: boolean }) {
@@ -41,6 +41,7 @@ const MENU_CATEGORIES = [
   { icon: "🎨", label: "画質設定", action: "quality" as const },
   { icon: "♪", label: "表示・音声", action: "audio" as const },
   { icon: "⚙", label: "オーバーレイ", action: "display" as const },
+  { icon: "⏺", label: "録画設定", action: "recording" as const },
 ] as const;
 
 type MenuCategory = (typeof MENU_CATEGORIES)[number]["action"];
@@ -50,6 +51,7 @@ const CATEGORY_TITLES: Record<string, string> = {
   quality: "画質設定",
   audio: "表示・音声",
   display: "オーバーレイ設定",
+  recording: "録画設定",
 };
 
 /* ── Setting row controls ── */
@@ -333,7 +335,7 @@ function MenuOverlay({
   if (L) {
     /* ── Landscape: left sidebar + content panel (reference image layout) ── */
     return (
-      <div style={{ position: "absolute", inset: 0, zIndex: 50, display: "flex", pointerEvents: "auto" }}>
+      <div style={{ position: "absolute", inset: 0, zIndex: Z.menu, display: "flex", pointerEvents: "auto" }}>
         {/* Sidebar: 5% width */}
         <div style={{ width: "5%", display: "flex", flexDirection: "column" }}>
           {sidebar(false)}
@@ -353,7 +355,7 @@ function MenuOverlay({
 
   /* ── Portrait: bottom sheet (full width, top tab bar + content ~50% height) ── */
   return (
-    <div style={{ position: "absolute", inset: 0, zIndex: 50, display: "flex", flexDirection: "column", pointerEvents: "auto" }}>
+    <div style={{ position: "absolute", inset: 0, zIndex: Z.menu, display: "flex", flexDirection: "column", pointerEvents: "auto" }}>
       {/* Top transparent tap-to-close */}
       <div onClick={onClose} style={{ flex: 1, cursor: "pointer" }} />
       {/* Tab bar: horizontal icons, full width */}
@@ -387,7 +389,7 @@ export function CamcorderMenu(props: CamcorderMenuProps) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <div style={{ position: "absolute", top: 10, left: 10, zIndex: 20, pointerEvents: "auto" }}>
+      <div style={{ position: "absolute", top: 10, left: 10, zIndex: Z.menuButton, pointerEvents: "auto" }}>
         <MenuButton onClick={() => setOpen((v) => !v)} active={open} />
       </div>
       {open && <MenuOverlay onClose={() => setOpen(false)} {...props} />}

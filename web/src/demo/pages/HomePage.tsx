@@ -4,6 +4,8 @@ import { Drawer } from "react-panel-layout";
 import { NtscCanvas } from "../components/NtscCanvas";
 import { SettingsPanel } from "../components/SettingsPanel";
 import { useNtscPipeline } from "../hooks/useNtscPipeline";
+import { createBlobUrl } from "../hooks/useBlobUrl";
+import { Z } from "../design-tokens";
 import {
   DEFAULT_PARAMS,
   DEFAULT_PRESET_NAME,
@@ -25,11 +27,11 @@ export function HomePage() {
 
   useEffect(() => {
     if (pipeline) params.applyPreset(DEFAULT_PRESET_NAME);
-  }, [pipeline]);
+  }, [pipeline, params]);
 
   const handleFileSelect = useCallback(
     (file: File) => {
-      const url = URL.createObjectURL(file);
+      const url = createBlobUrl(file);
       const img = new Image();
       img.onload = () => pipeline?.processStill(img);
       img.src = url;
@@ -86,7 +88,7 @@ export function HomePage() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 100,
+            zIndex: Z.loading,
           }}
         >
           <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 14 }}>
@@ -99,7 +101,7 @@ export function HomePage() {
         <div
           style={{
             position: "relative",
-            zIndex: 1,
+            zIndex: Z.content,
             width: "100%",
             height: "100%",
             display: "flex",
@@ -226,7 +228,7 @@ export function HomePage() {
               alignItems: "center",
               justifyContent: "space-between",
               padding: "0 16px",
-              zIndex: 10,
+              zIndex: Z.header,
               pointerEvents: "none",
             }}
           >
@@ -266,7 +268,7 @@ export function HomePage() {
               color: "#fff",
               fontSize: 22,
               cursor: "pointer",
-              zIndex: 20,
+              zIndex: Z.menuButton,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -290,7 +292,7 @@ export function HomePage() {
             isOpen={settingsOpen}
             onClose={() => setSettingsOpen(false)}
             onOpen={() => setSettingsOpen(true)}
-            zIndex={30}
+            zIndex={Z.drawer}
           >
             <div
               style={{

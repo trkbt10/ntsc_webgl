@@ -1,9 +1,15 @@
 import { useCallback } from "react";
 import type { MediaEntry } from "../media-store-types";
+import { DEFAULT_CAMCORDER_STATE } from "../camcorder-settings";
+import { PHOTO_MIME, THUMBNAIL_MIME } from "../utils/mime";
+import { createMediaEntry } from "../utils/media-entry";
 
-const THUMB_WIDTH = 160;
+export interface ThumbnailOptions {
+  width?: number;
+  quality?: number;
+}
 
-function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
+export function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => blob ? resolve(blob) : reject(new Error("toBlob failed")),
@@ -13,33 +19,30 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number)
   });
 }
 
-function generateThumbnail(source: HTMLCanvasElement): Promise<Blob> {
-  const ratio = THUMB_WIDTH / source.width;
+export function generateThumbnail(
+  source: HTMLCanvasElement,
+  opts?: ThumbnailOptions,
+): Promise<Blob> {
+  const thumbW = opts?.width ?? DEFAULT_CAMCORDER_STATE.thumbWidth;
+  const quality = opts?.quality ?? DEFAULT_CAMCORDER_STATE.thumbQuality;
+  const ratio = thumbW / source.width;
   const thumbH = Math.round(source.height * ratio);
   const offscreen = document.createElement("canvas");
-  offscreen.width = THUMB_WIDTH;
+  offscreen.width = thumbW;
   offscreen.height = thumbH;
   const ctx = offscreen.getContext("2d")!;
-  ctx.drawImage(source, 0, 0, THUMB_WIDTH, thumbH);
-  return canvasToBlob(offscreen, "image/jpeg", 0.7);
+  ctx.drawImage(source, 0, 0, thumbW, thumbH);
+  return canvasToBlob(offscreen, THUMBNAIL_MIME, quality);
 }
 
 export function usePhotoCapture() {
-  const capturePhoto = useCallback(async (canvas: HTMLCanvasElement): Promise<MediaEntry> => {
-    const blob = await canvasToBlob(canvas, "image/png");
-    const thumbnail = await generateThumbnail(canvas);
-
-    return {
-      id: crypto.randomUUID(),
-      type: "photo",
-      blob,
-      thumbnail,
-      timestamp: Date.now(),
-      size: blob.size,
-      width: canvas.width,
-      height: canvas.height,
-      mimeType: "image/png",
-    };
+  const capturePhoto = useCallback(async (
+    canvas: HTMLCanvasElement,
+    thumbOpts?: ThumbnailOptions,
+  ): Promise<MediaEntry> => {
+    const blob = await canvasToBlob(canvas, PHOTO_MIME);
+    const thumbnail = await generateThumbnail(canvas, thumbOpts);
+    return createMediaEntry("photo", blob, thumbnail, canvas, PHOTO_MIME);
   }, []);
 
   return { capturePhoto };

@@ -1,4 +1,4 @@
-import { COLOR } from "../../design-tokens";
+import { COLOR, RATIO } from "../../design-tokens";
 
 export type ControlVariant = "primary" | "secondary" | "ghost";
 
@@ -18,12 +18,12 @@ const variantStyles: Record<ControlVariant, (size: number) => React.CSSPropertie
     background: "transparent",
   }),
   secondary: (size) => ({
-    width: size, height: size, borderRadius: size * 0.17,
+    width: size, height: size, borderRadius: size * RATIO.controlRadius,
     border: `1.5px solid ${COLOR.controlBorder}`,
     background: COLOR.controlBg,
   }),
   ghost: (size) => ({
-    width: size, height: size, borderRadius: size * 0.17,
+    width: size, height: size, borderRadius: size * RATIO.controlRadius,
     border: "none",
     background: "transparent",
   }),

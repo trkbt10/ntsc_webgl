@@ -24,6 +24,10 @@
     "build:demo": "npm run build:wasm && vite build",
     "build": "npm run build:lib && npm run build:demo",
     "preview": "vite preview",
+    "lint": "eslint src/demo/",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "tsc --noEmit && npm run lint && npm run test",
     "prepublishOnly": "npm run build:lib"
   },
   "keywords": [
@@ -41,16 +45,23 @@
     "url": "https://github.com/trkbt10/ntsc_webgl.git"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "jsdom": "^29.0.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-panel-layout": "^0.7.1",
     "react-router": "^7.13.1",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.1",
     "vite": "^8.0.0",
-    "vite-plugin-dts": "^4.5.4"
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "^4.1.0"
   },
   "dependencies": {
     "lucide-react": "^0.577.0"

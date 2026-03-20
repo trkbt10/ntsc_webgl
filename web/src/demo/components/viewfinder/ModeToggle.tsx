@@ -1,6 +1,6 @@
 import { Camera, Video } from "lucide-react";
 import { ControlButton } from "./ControlButton";
-import { CONTROL } from "../../design-tokens";
+import { CONTROL, iconSize as calcIconSize } from "../../design-tokens";
 import type { CaptureMode } from "../../media-store-types";
 
 interface ModeToggleProps {
@@ -10,7 +10,7 @@ interface ModeToggleProps {
 }
 
 export function ModeToggle({ mode, onToggle, size = CONTROL.secondary.size }: ModeToggleProps) {
-  const iconSize = Math.round(size * CONTROL.secondary.iconScale);
+  const iSize = calcIconSize(size);
   const Icon = mode === "photo" ? Camera : Video;
   return (
     <ControlButton
@@ -18,7 +18,7 @@ export function ModeToggle({ mode, onToggle, size = CONTROL.secondary.size }: Mo
       size={size}
       title={mode === "photo" ? "Switch to Video" : "Switch to Photo"}
     >
-      <Icon size={iconSize} strokeWidth={CONTROL.iconStroke} />
+      <Icon size={iSize} strokeWidth={CONTROL.iconStroke} />
     </ControlButton>
   );
 }

@@ -5,7 +5,7 @@ export interface CameraInfo {
   height: number;
   frameRate: number;
   facingMode: string;
-  audioChannels: number; // 0 = no audio, 1 = mono, 2 = stereo
+  audioChannels: number;
 }
 
 const EMPTY_INFO: CameraInfo = { width: 0, height: 0, frameRate: 0, facingMode: "", audioChannels: 0 };
@@ -23,16 +23,11 @@ export function useCamera({ initialFacing = "environment", enabled = false, audi
   const [facingMode, setFacingMode] = useState(initialFacing);
   const [cameraInfo, setCameraInfo] = useState<CameraInfo>(EMPTY_INFO);
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
-  const facingRef = useRef(facingMode);
-  const audioRef = useRef(audio);
-  audioRef.current = audio;
-  facingRef.current = facingMode;
 
   const queryTrackInfo = useCallback((stream: MediaStream) => {
     const videoTrack = stream.getVideoTracks()[0];
     const audioTrack = stream.getAudioTracks()[0];
-
-    let info: CameraInfo = { ...EMPTY_INFO };
+    const info: CameraInfo = { ...EMPTY_INFO };
 
     if (videoTrack) {
       try {
@@ -41,9 +36,7 @@ export function useCamera({ initialFacing = "environment", enabled = false, audi
         info.height = settings.height ?? 0;
         info.frameRate = settings.frameRate ?? 0;
         info.facingMode = settings.facingMode ?? "";
-      } catch {
-        // getSettings not supported
-      }
+      } catch { /* getSettings not supported */ }
     }
 
     if (audioTrack) {
@@ -51,14 +44,14 @@ export function useCamera({ initialFacing = "environment", enabled = false, audi
         const settings = audioTrack.getSettings();
         info.audioChannels = settings.channelCount ?? 1;
       } catch {
-        info.audioChannels = 1; // assume mono if can't query
+        info.audioChannels = 1;
       }
     }
 
     setCameraInfo(info);
   }, []);
 
-  const startCamera = useCallback(async (facing: string) => {
+  const startCamera = useCallback(async (facing: string, withAudio: boolean) => {
     if (!videoRef.current) {
       videoRef.current = document.createElement("video");
       videoRef.current.autoplay = true;
@@ -71,29 +64,26 @@ export function useCamera({ initialFacing = "environment", enabled = false, audi
     }
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: facing },
-      audio: audioRef.current,
+      audio: withAudio,
     });
     v.srcObject = stream;
     await v.play();
     queryTrackInfo(stream);
-    // Expose audio-only stream for AudioLevelMeter
     const audioTracks = stream.getAudioTracks();
-    if (audioTracks.length > 0) {
-      const audioOnly = new MediaStream(audioTracks);
-      setAudioStream(audioOnly);
-    } else {
-      setAudioStream(null);
-    }
+    setAudioStream(audioTracks.length > 0 ? new MediaStream(audioTracks) : null);
     setCameraReady(true);
     setCameraError(null);
   }, [queryTrackInfo]);
 
   useEffect(() => {
     if (enabled) {
-      startCamera(facingRef.current).catch((e) => {
+      startCamera(facingMode, audio).catch((e) => {
         setCameraError(e instanceof Error ? e.message : String(e));
       });
     }
+    // Only re-run when enabled changes or startCamera identity changes (stable)
+    // facingMode and audio are intentionally excluded — they change via flipCamera
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, startCamera]);
 
   useEffect(() => {
@@ -107,14 +97,14 @@ export function useCamera({ initialFacing = "environment", enabled = false, audi
   }, []);
 
   const flipCamera = useCallback(async () => {
-    const next = facingRef.current === "user" ? "environment" : "user";
+    const next = facingMode === "user" ? "environment" : "user";
     setFacingMode(next);
     try {
-      await startCamera(next);
+      await startCamera(next, audio);
     } catch (e) {
       console.warn("Could not flip camera:", e);
     }
-  }, [startCamera]);
+  }, [startCamera, facingMode, audio]);
 
   return {
     videoRef,

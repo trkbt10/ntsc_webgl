@@ -1,5 +1,6 @@
 import type { LayoutProps } from "./types";
 import { type LayoutPreset, LAYOUT_REGISTRY } from "./registry";
+import { Z } from "../../design-tokens";
 
 interface Props extends LayoutProps {
   preset: LayoutPreset;
@@ -8,7 +9,7 @@ interface Props extends LayoutProps {
 export function ViewfinderLayout({ preset, ...props }: Props) {
   const entry = LAYOUT_REGISTRY[preset];
   return (
-    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 5 }}>
+    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: Z.viewfinder }}>
       {entry.component(props)}
     </div>
   );

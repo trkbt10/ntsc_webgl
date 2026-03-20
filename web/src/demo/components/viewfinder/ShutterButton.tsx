@@ -1,5 +1,5 @@
 import { ControlButton } from "./ControlButton";
-import { CONTROL } from "../../design-tokens";
+import { CONTROL, COLOR, RATIO } from "../../design-tokens";
 
 interface ShutterButtonProps {
   onCapture: () => void;
@@ -11,9 +11,9 @@ export function ShutterButton({ onCapture, size = CONTROL.primary.size }: Shutte
     <ControlButton onClick={onCapture} size={size} variant="primary" title="Take Photo">
       <div
         style={{
-          width: size * 0.78, height: size * 0.78,
+          width: size * RATIO.shutterInner, height: size * RATIO.shutterInner,
           borderRadius: "50%",
-          background: "#fff",
+          background: COLOR.textPrimary,
           transition: "transform 0.12s",
         }}
       />

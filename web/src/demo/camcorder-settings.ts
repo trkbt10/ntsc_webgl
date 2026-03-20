@@ -18,7 +18,7 @@ export type SettingControl =
 export interface CamcorderSetting {
   id: string;
   label: string;
-  category: "camera" | "quality" | "audio" | "display";
+  category: "camera" | "quality" | "audio" | "display" | "recording";
   control: SettingControl;
 }
 
@@ -30,6 +30,12 @@ export interface CamcorderDisplayState {
   gridDisplay: boolean;      // show/hide ThirdsGrid in overlay
   histogram: boolean;        // show/hide histogram in overlay
   levelMeter: boolean;       // show/hide AudioLevelMeter in overlay
+  // Recording settings
+  recFps: number;            // canvas capture FPS (15/24/30/60)
+  recBitrate: number;        // video bitrate in bps
+  recFormat: string;         // "auto" | "webm" | "mp4"
+  thumbWidth: number;        // thumbnail width in px
+  thumbQuality: number;      // thumbnail JPEG quality (0.0-1.0)
 }
 
 export const DEFAULT_CAMCORDER_STATE: CamcorderDisplayState = {
@@ -39,6 +45,11 @@ export const DEFAULT_CAMCORDER_STATE: CamcorderDisplayState = {
   gridDisplay: false,
   histogram: false,
   levelMeter: true,
+  recFps: 30,
+  recBitrate: 4_000_000,
+  recFormat: "auto",
+  thumbWidth: 160,
+  thumbQuality: 0.7,
 };
 
 export const CAMCORDER_SETTINGS: CamcorderSetting[] = [
@@ -376,6 +387,79 @@ export const CAMCORDER_SETTINGS: CamcorderSetting[] = [
     label: "レベルメーター",
     category: "display",
     control: { type: "state-toggle", stateKey: "levelMeter" },
+  },
+
+  /* ──── 録画設定 ──── */
+  {
+    id: "rec_fps",
+    label: "録画フレームレート",
+    category: "recording",
+    control: {
+      type: "state-discrete",
+      stateKey: "recFps",
+      options: [
+        { label: "15fps", value: "15" },
+        { label: "24fps", value: "24" },
+        { label: "30fps", value: "30" },
+        { label: "60fps", value: "60" },
+      ],
+    },
+  },
+  {
+    id: "rec_bitrate",
+    label: "録画ビットレート",
+    category: "recording",
+    control: {
+      type: "state-discrete",
+      stateKey: "recBitrate",
+      options: [
+        { label: "1 Mbps", value: "1000000" },
+        { label: "2 Mbps", value: "2000000" },
+        { label: "4 Mbps", value: "4000000" },
+        { label: "8 Mbps", value: "8000000" },
+      ],
+    },
+  },
+  {
+    id: "rec_format",
+    label: "録画形式",
+    category: "recording",
+    control: {
+      type: "state-discrete",
+      stateKey: "recFormat",
+      options: [
+        { label: "自動", value: "auto" },
+        { label: "WebM", value: "webm" },
+        { label: "MP4", value: "mp4" },
+      ],
+    },
+  },
+  {
+    id: "thumb_width",
+    label: "サムネイル幅",
+    category: "recording",
+    control: {
+      type: "state-discrete",
+      stateKey: "thumbWidth",
+      options: [
+        { label: "80px", value: "80" },
+        { label: "160px", value: "160" },
+        { label: "320px", value: "320" },
+      ],
+    },
+  },
+  {
+    id: "thumb_quality",
+    label: "サムネイル品質",
+    category: "recording",
+    control: {
+      type: "state-range",
+      stateKey: "thumbQuality",
+      min: 0.3,
+      max: 1.0,
+      step: 0.1,
+      displayFn: (v) => `${Math.round(v * 100)}%`,
+    },
   },
 ];
 

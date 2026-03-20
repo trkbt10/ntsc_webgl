@@ -1,5 +1,5 @@
 import { ControlButton } from "./ControlButton";
-import { CONTROL, COLOR } from "../../design-tokens";
+import { CONTROL, COLOR, RATIO } from "../../design-tokens";
 
 interface RecordButtonProps {
   recording: boolean;
@@ -11,7 +11,7 @@ interface RecordButtonProps {
 export function RecordButton({ recording, onToggle, supported, size = CONTROL.primary.size }: RecordButtonProps) {
   if (!supported) return null;
 
-  const innerSize = recording ? size * 0.39 : size * 0.75;
+  const innerSize = recording ? size * RATIO.recordActive : size * RATIO.recordIdle;
   return (
     <ControlButton onClick={onToggle} size={size} variant="primary" title={recording ? "Stop & Save" : "Record"}>
       <div

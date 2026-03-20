@@ -1,6 +1,6 @@
 import { Images } from "lucide-react";
 import { ControlButton } from "./ControlButton";
-import { CONTROL, COLOR } from "../../design-tokens";
+import { CONTROL, COLOR, TRANSITION, iconSize as calcIconSize } from "../../design-tokens";
 
 interface GalleryButtonProps {
   thumbnailUrl: string | null;
@@ -10,7 +10,7 @@ interface GalleryButtonProps {
 }
 
 export function GalleryButton({ thumbnailUrl, count, onOpen, size = CONTROL.secondary.size }: GalleryButtonProps) {
-  const iconSize = Math.round(size * CONTROL.secondary.iconScale);
+  const iSize = calcIconSize(size);
   return (
     <ControlButton
       onClick={onOpen}
@@ -19,13 +19,13 @@ export function GalleryButton({ thumbnailUrl, count, onOpen, size = CONTROL.seco
       style={{
         overflow: "hidden",
         position: "relative",
-        viewTransitionName: "gallery-button",
+        viewTransitionName: TRANSITION.galleryButton,
       }}
     >
       {thumbnailUrl ? (
         <img src={thumbnailUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", position: "absolute", inset: 0 }} />
       ) : (
-        <Images size={iconSize} strokeWidth={CONTROL.iconStroke} />
+        <Images size={iSize} strokeWidth={CONTROL.iconStroke} />
       )}
       {count > 0 && (
         <span style={{

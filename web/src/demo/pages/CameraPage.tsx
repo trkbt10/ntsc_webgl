@@ -6,6 +6,7 @@ import { CameraErrorView } from "../components/CameraErrorView";
 import { ViewfinderLayout } from "../components/layout";
 import { useNtscPipeline } from "../hooks/useNtscPipeline";
 import { useCamera } from "../hooks/useCamera";
+import { Z } from "../design-tokens";
 import { useOrientation } from "../hooks/useOrientation";
 import {
   DEFAULT_PARAMS,
@@ -30,7 +31,7 @@ export function CameraPage() {
 
   useEffect(() => {
     if (pipeline) params.applyPreset(DEFAULT_PRESET_NAME);
-  }, [pipeline]);
+  }, [pipeline, params]);
 
   useEffect(() => {
     if (cameraReady && pipeline && videoRef.current) {
@@ -72,7 +73,7 @@ export function CameraPage() {
       />
 
       {!ready && (
-        <div style={{ position: "fixed", inset: 0, background: "#000", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
+        <div style={{ position: "fixed", inset: 0, background: "#000", display: "flex", alignItems: "center", justifyContent: "center", zIndex: Z.loading }}>
           <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 14 }}>Loading...</div>
         </div>
       )}
@@ -87,7 +88,7 @@ export function CameraPage() {
           border: "none",
           background: settingsOpen ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.15)",
           color: "#fff", fontSize: 22, cursor: "pointer",
-          zIndex: 20,
+          zIndex: Z.menuButton,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}
       >
@@ -103,7 +104,7 @@ export function CameraPage() {
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onOpen={() => setSettingsOpen(true)}
-        zIndex={30}
+        zIndex={Z.drawer}
       >
         <div style={{
           background: "rgba(20, 20, 20, 0.92)",

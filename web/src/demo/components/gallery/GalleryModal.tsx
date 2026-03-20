@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import type { MediaEntry } from "../../media-store-types";
-import { HARDWARE_BUTTON, CONTROL, COLOR } from "../../design-tokens";
+import { HARDWARE_BUTTON, CONTROL, COLOR, Z, TRANSITION } from "../../design-tokens";
 import { GalleryItem } from "./GalleryItem";
 import { MediaPreview } from "./MediaPreview";
 import { useViewTransition } from "../../hooks/useViewTransition";
@@ -43,17 +43,16 @@ export function GalleryModal({ entries, onClose, onDelete }: GalleryModalProps) 
 
   return (
     <div style={{
-      position: "fixed", inset: 0, zIndex: 200,
+      position: "fixed", inset: 0, zIndex: Z.gallery,
       background: COLOR.overlayBg,
       display: "flex", flexDirection: "column",
       overflow: "hidden",
-      viewTransitionName: "gallery-modal",
+      viewTransitionName: TRANSITION.galleryModal,
     }}>
-      {/* Header */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "12px 16px", flexShrink: 0,
-        borderBottom: "1px solid rgba(255,255,255,0.1)",
+        borderBottom: `1px solid ${COLOR.separator}`,
       }}>
         <span style={{ color: COLOR.textPrimary, fontSize: 14, fontWeight: 600 }}>
           Camera Roll ({entries.length})
@@ -64,7 +63,6 @@ export function GalleryModal({ entries, onClose, onDelete }: GalleryModalProps) 
         </button>
       </div>
 
-      {/* Grid */}
       <div style={{ flex: 1, overflow: "auto", padding: 12 }}>
         {entries.length === 0 ? (
           <div style={{
@@ -84,7 +82,7 @@ export function GalleryModal({ entries, onClose, onDelete }: GalleryModalProps) 
                 key={entry.id}
                 entry={entry}
                 onSelect={handleSelect}
-                onDelete={(id) => startTransition(() => onDelete(id))}
+                onDelete={handleDelete}
               />
             ))}
           </div>

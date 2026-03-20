@@ -1,38 +1,14 @@
 import { useState, useRef, useCallback } from "react";
+import { downloadBlob } from "./useBlobUrl";
+import { canRecord, pickVideoMime, mediaFilename } from "../utils/mime";
 
-/**
- * Records the NTSC-processed output from a canvas element using MediaRecorder.
- * This captures what the user actually sees (the processed video), not the raw camera.
- */
-
-/** Check if MediaRecorder is available and can record video */
-export function canRecord(): boolean {
-  if (typeof MediaRecorder === "undefined") return false;
-  try {
-    return MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
-      || MediaRecorder.isTypeSupported("video/webm")
-      || MediaRecorder.isTypeSupported("video/mp4");
-  } catch {
-    return false;
-  }
-}
-
-function pickMimeType(): string {
-  for (const mime of [
-    "video/webm;codecs=vp8,opus",
-    "video/webm;codecs=vp8",
-    "video/webm",
-    "video/mp4",
-  ]) {
-    try {
-      if (MediaRecorder.isTypeSupported(mime)) return mime;
-    } catch { /* skip */ }
-  }
-  return "video/webm";
-}
+export { canRecord };
 
 export interface CanvasRecorderOptions {
   onComplete?: (blob: Blob, mimeType: string) => void;
+  fps?: number;
+  bitrate?: number;
+  format?: string;
 }
 
 export function useCanvasRecorder(canvas: HTMLCanvasElement | null, options?: CanvasRecorderOptions) {
@@ -40,14 +16,17 @@ export function useCanvasRecorder(canvas: HTMLCanvasElement | null, options?: Ca
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const startTimeRef = useRef<number>(0);
-  const optionsRef = useRef(options);
-  optionsRef.current = options;
+
+  const onComplete = options?.onComplete;
+  const fps = options?.fps ?? 30;
+  const bitrate = options?.bitrate ?? 4_000_000;
+  const format = options?.format ?? "auto";
 
   const start = useCallback(() => {
     if (!canvas || !canRecord()) return;
-    const stream = canvas.captureStream(30);
-    const mimeType = pickMimeType();
-    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000 });
+    const stream = canvas.captureStream(fps);
+    const mimeType = pickVideoMime(format);
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: bitrate });
     chunksRef.current = [];
     startTimeRef.current = Date.now();
     recorder.ondataavailable = (e) => {
@@ -55,21 +34,16 @@ export function useCanvasRecorder(canvas: HTMLCanvasElement | null, options?: Ca
     };
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: mimeType });
-      if (optionsRef.current?.onComplete) {
-        optionsRef.current.onComplete(blob, mimeType);
+      if (onComplete) {
+        onComplete(blob, mimeType);
       } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `ntsc-recording-${Date.now()}.webm`;
-        a.click();
-        URL.revokeObjectURL(url);
+        downloadBlob(blob, mediaFilename("video", Date.now(), mimeType));
       }
     };
     recorder.start(1000);
     recorderRef.current = recorder;
     setRecording(true);
-  }, [canvas]);
+  }, [canvas, onComplete, fps, bitrate, format]);
 
   const stop = useCallback(() => {
     const duration = Date.now() - startTimeRef.current;

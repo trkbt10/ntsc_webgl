@@ -80,14 +80,14 @@ export function useMediaStore() {
     await refresh();
   }, [refresh]);
 
-  const lastThumbnailUrl = entries.length > 0
-    ? URL.createObjectURL(entries[0].thumbnail)
-    : null;
+  const latestThumbnail = entries.length > 0 ? entries[0].thumbnail : null;
+  const latestId = entries.length > 0 ? entries[0].id : null;
 
   return {
     entries,
     count: entries.length,
-    lastThumbnailUrl,
+    latestThumbnail,
+    latestId,
     addEntry,
     deleteEntry,
     refresh,

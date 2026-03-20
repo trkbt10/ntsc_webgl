@@ -1,7 +1,9 @@
-import { useMemo } from "react";
 import { ArrowLeft, Download, Trash2 } from "lucide-react";
 import type { MediaEntry } from "../../media-store-types";
-import { HARDWARE_BUTTON, HARDWARE_BUTTON_DANGER, CONTROL, COLOR } from "../../design-tokens";
+import { HARDWARE_BUTTON, HARDWARE_BUTTON_DANGER, CONTROL, COLOR, Z, TRANSITION } from "../../design-tokens";
+import { useBlobUrl } from "../../hooks/useBlobUrl";
+import { useMedia } from "../../contexts/MediaContext";
+import { formatSize, formatTimestamp } from "../../utils/format";
 
 interface MediaPreviewProps {
   entry: MediaEntry;
@@ -9,27 +11,17 @@ interface MediaPreviewProps {
   onDelete: (id: string) => void;
 }
 
-function download(entry: MediaEntry) {
-  const url = URL.createObjectURL(entry.blob);
-  const a = document.createElement("a");
-  a.href = url;
-  const ext = entry.type === "photo" ? "png" : "webm";
-  a.download = `ntsc-${entry.type}-${entry.timestamp}.${ext}`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
 export function MediaPreview({ entry, onClose, onDelete }: MediaPreviewProps) {
-  const blobUrl = useMemo(() => URL.createObjectURL(entry.blob), [entry.blob]);
+  const { downloadEntry } = useMedia();
+  const blobUrl = useBlobUrl(entry.blob, entry.id);
 
   return (
     <div style={{
-      position: "fixed", inset: 0, zIndex: 200,
+      position: "fixed", inset: 0, zIndex: Z.gallery,
       background: COLOR.overlayBg,
       display: "flex", flexDirection: "column",
-      viewTransitionName: "gallery-preview",
+      viewTransitionName: TRANSITION.galleryPreview,
     }}>
-      {/* Top bar */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "12px 16px", flexShrink: 0,
@@ -39,7 +31,7 @@ export function MediaPreview({ entry, onClose, onDelete }: MediaPreviewProps) {
           <span>BACK</span>
         </button>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => download(entry)} style={{ ...HARDWARE_BUTTON, fontSize: 11, padding: "5px 12px" }}>
+          <button onClick={() => downloadEntry(entry)} style={{ ...HARDWARE_BUTTON, fontSize: 11, padding: "5px 12px" }}>
             <Download size={14} strokeWidth={CONTROL.iconStroke} />
             <span>SAVE</span>
           </button>
@@ -50,12 +42,11 @@ export function MediaPreview({ entry, onClose, onDelete }: MediaPreviewProps) {
         </div>
       </div>
 
-      {/* Content */}
       <div style={{
         flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
         overflow: "hidden", padding: 16,
       }}>
-        {entry.type === "photo" ? (
+        {blobUrl && (entry.type === "photo" ? (
           <img
             src={blobUrl}
             alt=""
@@ -68,18 +59,17 @@ export function MediaPreview({ entry, onClose, onDelete }: MediaPreviewProps) {
             autoPlay
             style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: 4 }}
           />
-        )}
+        ))}
       </div>
 
-      {/* Info */}
       <div style={{
         padding: "8px 16px 12px", flexShrink: 0,
         fontSize: 11, color: COLOR.textSecondary,
         display: "flex", gap: 16,
       }}>
         <span>{entry.width}×{entry.height}</span>
-        <span>{(entry.size / (1024 * 1024)).toFixed(1)} MB</span>
-        <span>{new Date(entry.timestamp).toLocaleString()}</span>
+        <span>{formatSize(entry.size)}</span>
+        <span>{formatTimestamp(entry.timestamp)}</span>
         {entry.duration != null && <span>{(entry.duration / 1000).toFixed(1)}s</span>}
       </div>
     </div>
