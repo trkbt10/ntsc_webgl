@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { NtscCanvas } from "../components/NtscCanvas";
 import { CameraErrorView } from "../components/CameraErrorView";
 import { ViewfinderLayout, type LayoutPreset } from "../components/layout";
-import { CamcorderMenu } from "../components/CamcorderMenu";
+import { CamcorderMenu } from "../components/camcorder-menu";
 import { Z } from "../design-tokens";
 import { GalleryModal } from "../components/gallery";
 import { useNtscPipeline } from "../hooks/useNtscPipeline";
@@ -27,7 +27,12 @@ function VideoCamInner({ camcorderState, onStateChange }: {
   onStateChange: (key: string, value: string | number | boolean) => void;
 }) {
   const { canvasRef, pipeline, ready, error: pipelineError, fps } = useNtscPipeline();
-  const { videoRef, cameraReady, cameraError, flipCamera, cameraInfo, audioStream } = useCamera({ enabled: ready, audio: true });
+  const { videoRef, cameraReady, cameraError, flipCamera, cameraInfo, audioStream } = useCamera({
+    enabled: ready,
+    audio: true,
+    resolution: camcorderState.cameraResolution,
+    inputFps: camcorderState.cameraFps,
+  });
   const battery = useBattery();
   const orientation = useOrientation();
   const media = useMedia();
@@ -45,7 +50,7 @@ function VideoCamInner({ camcorderState, onStateChange }: {
 
   const { recording, toggle: toggleRecording, canRecord: recordingSupported } = useCanvasRecorder(
     canvasEl,
-    { onComplete: handleVideoComplete, fps: media.recFps, bitrate: media.recBitrate, format: media.recFormat },
+    { onComplete: handleVideoComplete, fps: media.recFps, bitrate: media.recBitrate, format: media.recFormat, audioStream, audioEnabled: media.recAudio },
   );
 
   const handleCapturePhoto = useCallback(async () => {
@@ -137,7 +142,7 @@ export function VideoCamPage() {
   const [camcorderState, setCamcorderState] = useState<CamcorderDisplayState>(DEFAULT_CAMCORDER_STATE);
 
   const handleStateChange = useCallback((key: string, value: string | number | boolean) => {
-    const NUMERIC_KEYS = ["recFps", "recBitrate", "thumbWidth"];
+    const NUMERIC_KEYS = ["recFps", "recBitrate", "thumbWidth", "photoQuality"];
     const parsed = typeof value === "string" && NUMERIC_KEYS.includes(key)
       ? Number(value)
       : value;

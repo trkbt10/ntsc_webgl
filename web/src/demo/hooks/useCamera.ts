@@ -14,9 +14,30 @@ interface UseCameraOptions {
   initialFacing?: string;
   enabled?: boolean;
   audio?: boolean;
+  resolution?: string;  // "auto" | "480p" | "720p" | "1080p"
+  inputFps?: string;    // "auto" | "15" | "24" | "30" | "60"
 }
 
-export function useCamera({ initialFacing = "environment", enabled = false, audio = false }: UseCameraOptions = {}) {
+const RESOLUTION_MAP: Record<string, { width: number; height: number }> = {
+  "480p":  { width: 640, height: 480 },
+  "720p":  { width: 1280, height: 720 },
+  "1080p": { width: 1920, height: 1080 },
+};
+
+function buildVideoConstraints(facing: string, resolution?: string, inputFps?: string): MediaTrackConstraints {
+  const c: MediaTrackConstraints = { facingMode: facing };
+  const res = resolution && resolution !== "auto" ? RESOLUTION_MAP[resolution] : undefined;
+  if (res) {
+    c.width = { ideal: res.width };
+    c.height = { ideal: res.height };
+  }
+  if (inputFps && inputFps !== "auto") {
+    c.frameRate = { ideal: Number(inputFps) };
+  }
+  return c;
+}
+
+export function useCamera({ initialFacing = "environment", enabled = false, audio = false, resolution, inputFps }: UseCameraOptions = {}) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -62,10 +83,25 @@ export function useCamera({ initialFacing = "environment", enabled = false, audi
     if (v.srcObject) {
       (v.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
     }
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: facing },
-      audio: withAudio,
-    });
+    let stream: MediaStream;
+    const constraints = buildVideoConstraints(facing, resolution, inputFps);
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: constraints,
+        audio: withAudio,
+      });
+    } catch (e) {
+      // If constrained request fails, fall back to basic facingMode only
+      if (resolution !== "auto" || inputFps !== "auto") {
+        console.warn("Camera constraints rejected, falling back to auto:", e);
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: facing },
+          audio: withAudio,
+        });
+      } else {
+        throw e;
+      }
+    }
     v.srcObject = stream;
     await v.play();
     queryTrackInfo(stream);
@@ -73,7 +109,7 @@ export function useCamera({ initialFacing = "environment", enabled = false, audi
     setAudioStream(audioTracks.length > 0 ? new MediaStream(audioTracks) : null);
     setCameraReady(true);
     setCameraError(null);
-  }, [queryTrackInfo]);
+  }, [queryTrackInfo, resolution, inputFps]);
 
   useEffect(() => {
     if (enabled) {

@@ -24,6 +24,9 @@ interface MediaContextValue {
   recFps: number;
   recBitrate: number;
   recFormat: string;
+  recAudio: boolean;
+  photoFormat: string;
+  photoQuality: number;
 }
 
 const Ctx = createContext<MediaContextValue | null>(null);
@@ -48,6 +51,8 @@ export function MediaProvider({ camcorderState, children }: MediaProviderProps) 
 
   const thumbWidth = camcorderState.thumbWidth;
   const thumbQuality = camcorderState.thumbQuality;
+  const photoFormat = camcorderState.photoFormat;
+  const photoQuality = camcorderState.photoQuality;
 
   const [captureMode, setCaptureMode] = useState<CaptureMode>("video");
   const toggleMode = useCallback(() => {
@@ -63,9 +68,15 @@ export function MediaProvider({ camcorderState, children }: MediaProviderProps) 
   }, [startTransition]);
 
   const capturePhoto = useCallback(async (canvas: HTMLCanvasElement) => {
-    const entry = await rawCapturePhoto(canvas, { width: thumbWidth, quality: thumbQuality });
+    const photoMime = photoFormat === "jpeg" ? "image/jpeg" : "image/png";
+    const entry = await rawCapturePhoto(canvas, {
+      width: thumbWidth,
+      quality: thumbQuality,
+      photoMime,
+      photoQuality: photoFormat === "jpeg" ? photoQuality : undefined,
+    });
     startTransition(() => { store.addEntry(entry); });
-  }, [rawCapturePhoto, store, startTransition, thumbWidth, thumbQuality]);
+  }, [rawCapturePhoto, store, startTransition, thumbWidth, thumbQuality, photoFormat, photoQuality]);
 
   const saveVideoRecording = useCallback(async (blob: Blob, mimeType: string, canvas: HTMLCanvasElement) => {
     const thumbnail = await generateThumbnail(canvas, { width: thumbWidth, quality: thumbQuality });
@@ -98,6 +109,9 @@ export function MediaProvider({ camcorderState, children }: MediaProviderProps) 
     recFps: camcorderState.recFps,
     recBitrate: camcorderState.recBitrate,
     recFormat: camcorderState.recFormat,
+    recAudio: camcorderState.recAudio,
+    photoFormat: camcorderState.photoFormat,
+    photoQuality: camcorderState.photoQuality,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

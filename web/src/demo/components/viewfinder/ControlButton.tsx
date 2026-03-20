@@ -1,4 +1,4 @@
-import { COLOR, RATIO } from "../../design-tokens";
+import { COLOR, RATIO, CONTROL } from "../../design-tokens";
 
 export type ControlVariant = "primary" | "secondary" | "ghost";
 
@@ -14,12 +14,13 @@ interface ControlButtonProps {
 const variantStyles: Record<ControlVariant, (size: number) => React.CSSProperties> = {
   primary: (size) => ({
     width: size, height: size, borderRadius: "50%",
-    border: `3px solid ${COLOR.controlBorderStrong}`,
+    border: `${CONTROL.primary.borderWidth}px solid ${COLOR.controlBorderStrong}`,
     background: "transparent",
+    margin: `${-CONTROL.primary.borderWidth}px 0`,
   }),
   secondary: (size) => ({
     width: size, height: size, borderRadius: size * RATIO.controlRadius,
-    border: `1.5px solid ${COLOR.controlBorder}`,
+    border: `${CONTROL.secondary.borderWidth}px solid ${COLOR.controlBorder}`,
     background: COLOR.controlBg,
   }),
   ghost: (size) => ({

@@ -57,17 +57,6 @@ interface FBO {
   texture: WebGLTexture;
 }
 
-interface ViewportCache {
-  canvasW: number;
-  canvasH: number;
-  frameW: number;
-  frameH: number;
-  vx: number;
-  vy: number;
-  vw: number;
-  vh: number;
-}
-
 // Default parameter values
 const DEFAULT_PARAMS: Record<string, number> = {
   video_noise: 2,
@@ -110,7 +99,6 @@ export class NtscGL {
   private height = 0;
   private frameCounter = 0;
   private params: Record<string, number>;
-  private vpCache: ViewportCache | null = null;
   private edgeWaveData: Float32Array | null = null;
   private edgeWaveRng = 0x12345678;
 
@@ -200,6 +188,11 @@ export class NtscGL {
     this.width = width;
     this.height = height;
     this.kernelsDirty = true;
+
+    // Canvas buffer = frame size; CSS handles display scaling
+    const canvas = this.gl.canvas as HTMLCanvasElement;
+    canvas.width = width;
+    canvas.height = height;
 
     // Recreate FBOs at new size
     this.deleteFBO(this.fboA);
@@ -356,60 +349,13 @@ export class NtscGL {
     this.setKernelUniform(5, "u_outChromaKernel", this.outChromaKernel);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-    // Pass 6: FBO-B → Screen (YIQ→RGB)
-    this.syncCanvasSize();
+    // Pass 6: FBO-B → Screen (YIQ→RGB, full canvas — no letterboxing)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    this.setupViewport(w, h);
-    gl.useProgram(this.passes[6].program);
-    this.bindInputTexture(6, this.fboB.texture, 0);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-    gl.bindVertexArray(null);
-  }
-
-  /** Read back the rendered frame as RGBA pixels (for lastFrame caching). */
-  getPixels(): Uint8Array {
-    const gl = this.gl;
-    const w = this.width;
-    const h = this.height;
-
-    // Render pass 6 (YIQ→RGB) to a temporary RGBA8 FBO for readback
-    const readTex = this.createTexture(gl.NEAREST);
-    gl.bindTexture(gl.TEXTURE_2D, readTex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-
-    const readFbo = gl.createFramebuffer()!;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, readFbo);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, readTex, 0);
-
     gl.viewport(0, 0, w, h);
-    gl.bindVertexArray(this.vao);
     gl.useProgram(this.passes[6].program);
     this.bindInputTexture(6, this.fboB.texture, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.bindVertexArray(null);
 
-    const pixels = new Uint8Array(w * h * 4);
-    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.deleteFramebuffer(readFbo);
-    gl.deleteTexture(readTex);
-
-    return pixels;
-  }
-
-  /** Re-render last processed frame to screen (e.g. after canvas resize). */
-  redraw(): void {
-    if (this.width === 0 || this.height === 0) return;
-    const gl = this.gl;
-    this.syncCanvasSize();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    this.setupViewport(this.width, this.height);
-    gl.bindVertexArray(this.vao);
-    gl.useProgram(this.passes[6].program);
-    this.bindInputTexture(6, this.fboB.texture, 0);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.bindVertexArray(null);
   }
 
@@ -586,52 +532,6 @@ export class NtscGL {
     const vhsC = getVhsChromaKernel(w);
     this.vhsChromaKernel.set(vhsC.weights);
     this.vhsChromaRadius = vhsC.radius;
-  }
-
-  private syncCanvasSize(): void {
-    const canvas = this.gl.canvas as HTMLCanvasElement;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.round((canvas.clientWidth || window.innerWidth) * dpr);
-    const h = Math.round((canvas.clientHeight || window.innerHeight) * dpr);
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width = w;
-      canvas.height = h;
-      this.vpCache = null;
-    }
-  }
-
-  private setupViewport(frameW: number, frameH: number): void {
-    const gl = this.gl;
-    const cw = gl.canvas.width;
-    const ch = gl.canvas.height;
-
-    let vp = this.vpCache;
-    if (
-      !vp ||
-      vp.canvasW !== cw ||
-      vp.canvasH !== ch ||
-      vp.frameW !== frameW ||
-      vp.frameH !== frameH
-    ) {
-      const scale = Math.min(cw / frameW, ch / frameH);
-      const vw = Math.round(frameW * scale);
-      const vh = Math.round(frameH * scale);
-      vp = {
-        canvasW: cw,
-        canvasH: ch,
-        frameW,
-        frameH,
-        vx: Math.round((cw - vw) / 2),
-        vy: Math.round((ch - vh) / 2),
-        vw,
-        vh,
-      };
-      this.vpCache = vp;
-    }
-
-    gl.clearColor(0, 0, 0, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.viewport(vp.vx, vp.vy, vp.vw, vp.vh);
   }
 
   private updateEdgeWave(): void {

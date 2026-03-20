@@ -30,12 +30,19 @@ export interface CamcorderDisplayState {
   gridDisplay: boolean;      // show/hide ThirdsGrid in overlay
   histogram: boolean;        // show/hide histogram in overlay
   levelMeter: boolean;       // show/hide AudioLevelMeter in overlay
+  // Camera input settings
+  cameraResolution: string;  // "auto" | "480p" | "720p" | "1080p"
+  cameraFps: string;         // "auto" | "15" | "24" | "30" | "60"
   // Recording settings
   recFps: number;            // canvas capture FPS (15/24/30/60)
   recBitrate: number;        // video bitrate in bps
   recFormat: string;         // "auto" | "webm" | "mp4"
+  recAudio: boolean;         // mix camera audio into recording
   thumbWidth: number;        // thumbnail width in px
   thumbQuality: number;      // thumbnail JPEG quality (0.0-1.0)
+  // Photo settings
+  photoFormat: string;       // "png" | "jpeg"
+  photoQuality: number;      // JPEG quality (0.3-1.0), only used when photoFormat=jpeg
 }
 
 export const DEFAULT_CAMCORDER_STATE: CamcorderDisplayState = {
@@ -45,11 +52,16 @@ export const DEFAULT_CAMCORDER_STATE: CamcorderDisplayState = {
   gridDisplay: false,
   histogram: false,
   levelMeter: true,
+  cameraResolution: "auto",
+  cameraFps: "auto",
   recFps: 30,
   recBitrate: 4_000_000,
   recFormat: "auto",
+  recAudio: true,
   thumbWidth: 160,
   thumbQuality: 0.7,
+  photoFormat: "png",
+  photoQuality: 0.85,
 };
 
 export const CAMCORDER_SETTINGS: CamcorderSetting[] = [
@@ -165,6 +177,37 @@ export const CAMCORDER_SETTINGS: CamcorderSetting[] = [
         const offset = Math.round(((v - 25) / 25) * 10);
         return `${offset >= 0 ? "+" : ""}${offset}`;
       },
+    },
+  },
+  {
+    id: "camera_resolution",
+    label: "入力解像度",
+    category: "camera",
+    control: {
+      type: "state-discrete",
+      stateKey: "cameraResolution",
+      options: [
+        { label: "自動", value: "auto" },
+        { label: "480p", value: "480p" },
+        { label: "720p", value: "720p" },
+        { label: "1080p", value: "1080p" },
+      ],
+    },
+  },
+  {
+    id: "camera_fps",
+    label: "入力フレームレート",
+    category: "camera",
+    control: {
+      type: "state-discrete",
+      stateKey: "cameraFps",
+      options: [
+        { label: "自動", value: "auto" },
+        { label: "15fps", value: "15" },
+        { label: "24fps", value: "24" },
+        { label: "30fps", value: "30" },
+        { label: "60fps", value: "60" },
+      ],
     },
   },
   {
@@ -432,6 +475,38 @@ export const CAMCORDER_SETTINGS: CamcorderSetting[] = [
         { label: "WebM", value: "webm" },
         { label: "MP4", value: "mp4" },
       ],
+    },
+  },
+  {
+    id: "rec_audio",
+    label: "録画時音声",
+    category: "recording",
+    control: { type: "state-toggle", stateKey: "recAudio" },
+  },
+  {
+    id: "photo_format",
+    label: "写真形式",
+    category: "recording",
+    control: {
+      type: "state-discrete",
+      stateKey: "photoFormat",
+      options: [
+        { label: "PNG", value: "png" },
+        { label: "JPEG", value: "jpeg" },
+      ],
+    },
+  },
+  {
+    id: "photo_quality",
+    label: "写真品質 (JPEG)",
+    category: "recording",
+    control: {
+      type: "state-range",
+      stateKey: "photoQuality",
+      min: 0.3,
+      max: 1.0,
+      step: 0.05,
+      displayFn: (v: number) => `${Math.round(v * 100)}%`,
     },
   },
   {

@@ -1,18 +1,26 @@
 /**
  * Design tokens — single source of truth for viewfinder UI.
- * All control sizes, icon sizes, colors, spacing, typography,
- * z-index layers, and visual ratios derive from here.
+ *
+ * Grid system: 8px base unit (1U).
+ * Button ratio: 3:2 (primary 9U : secondary 6U).
+ * Tap targets: secondary ≥ 48px (Material 48dp / Apple HIG 44pt).
  */
+
+// ── Base grid ────────────────────────────────────────────────
+
+export const BASE_UNIT = 8;
 
 // ── Control button sizes (px) ───────────────────────────────
 
 export const CONTROL = {
-  /** Primary action button (record / shutter) */
-  primary: { size: 56, iconScale: 0.43 },
-  /** Secondary buttons (flip, mode toggle, gallery) */
-  secondary: { size: 36, iconScale: 0.5 },
+  /** Primary action button (record / shutter) — 9U, 3:2 ratio to secondary */
+  primary: { size: 72, iconScale: 0.44, borderWidth: 3 },
+  /** Secondary buttons (flip, mode toggle, gallery) — 6U */
+  secondary: { size: 48, iconScale: 0.5, borderWidth: 1.5 },
   /** Icon stroke width inside buttons */
   iconStroke: 2,
+  /** Minimum touch target — Apple HIG 44pt / Material 48dp */
+  minTouchTarget: 48,
 } as const;
 
 /** Compute icon pixel size for a given button size and variant */
@@ -48,7 +56,7 @@ export function controlSizes(preset: string, orientation: "landscape" | "portrai
   const scale = orientation === "landscape" ? s.landscape : s.portrait;
   return {
     primary: Math.round(CONTROL.primary.size * scale),
-    secondary: Math.round(CONTROL.secondary.size * scale),
+    secondary: Math.max(CONTROL.minTouchTarget, Math.round(CONTROL.secondary.size * scale)),
     iconStroke: CONTROL.iconStroke,
   };
 }
@@ -113,11 +121,34 @@ export const TRANSITION = {
   galleryItem: (id: string) => `gallery-item-${id}`,
 } as const;
 
-// ── Spacing ─────────────────────────────────────────────────
+// ── Spacing (8px grid) ──────────────────────────────────────
 
 export const SPACING = {
-  controlGap: 8,
-  edgePad: "3%",
+  /** 2U — between adjacent buttons */
+  controlGap: 16,
+  /** 3U — between button groups (left ↔ primary ↔ right) */
+  controlGroupGap: 24,
+  /** 3U — viewport edge padding */
+  edgePad: 24,
+  /** 2U — bottom padding inside control bar */
+  barPadBottom: 16,
+} as const;
+
+// ── Badge (gallery count) ───────────────────────────────────
+
+export const BADGE = {
+  size: 16,          // 2U
+  offset: -4,        // -0.5U
+  fontSize: 9,
+  borderRadius: 8,   // 1U
+} as const;
+
+// ── Layout positions (viewport-relative) ────────────────────
+
+export const LAYOUT = {
+  topBarHeight:     { landscape: "8%",  portrait: "6%" },
+  bottomZone:       { landscape: "14%", portrait: "24%" },
+  controlRowBottom: { landscape: "5%",  portrait: "4%" },
 } as const;
 
 // ── Hardware button style (MENU button family) ──────────────

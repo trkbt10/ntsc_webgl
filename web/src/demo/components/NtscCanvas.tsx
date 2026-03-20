@@ -11,6 +11,8 @@ export function NtscCanvas({ canvasRef, style }: NtscCanvasProps) {
         display: "block",
         width: "100%",
         height: "100%",
+        objectFit: "contain",
+        background: "#000",
         ...style,
       }}
     />

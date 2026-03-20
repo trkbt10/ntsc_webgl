@@ -7,6 +7,8 @@ import { createMediaEntry } from "../utils/media-entry";
 export interface ThumbnailOptions {
   width?: number;
   quality?: number;
+  photoMime?: string;
+  photoQuality?: number;
 }
 
 export function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
@@ -40,9 +42,10 @@ export function usePhotoCapture() {
     canvas: HTMLCanvasElement,
     thumbOpts?: ThumbnailOptions,
   ): Promise<MediaEntry> => {
-    const blob = await canvasToBlob(canvas, PHOTO_MIME);
+    const mime = thumbOpts?.photoMime ?? PHOTO_MIME;
+    const blob = await canvasToBlob(canvas, mime, thumbOpts?.photoQuality);
     const thumbnail = await generateThumbnail(canvas, thumbOpts);
-    return createMediaEntry("photo", blob, thumbnail, canvas, PHOTO_MIME);
+    return createMediaEntry("photo", blob, thumbnail, canvas, mime);
   }, []);
 
   return { capturePhoto };

@@ -4,7 +4,7 @@ import {
 } from "../../viewfinder";
 import { InteractiveWrap } from "../InteractiveWrap";
 import type { LayoutProps } from "../types";
-import { controlSizes, SPACING } from "../../../design-tokens";
+import { controlSizes, SPACING, LAYOUT } from "../../../design-tokens";
 
 const PRESET = "none";
 
@@ -31,8 +31,8 @@ export function NoneLayout(p: LayoutProps) {
   }
 
   return (
-    <div style={{ position: "absolute", bottom: "3%", left: 0, right: 0,
-      display: "flex", alignItems: "center", justifyContent: "center", gap: SPACING.controlGap * 2,
+    <div style={{ position: "absolute", bottom: LAYOUT.controlRowBottom.portrait, left: 0, right: 0,
+      display: "flex", alignItems: "center", justifyContent: "center", gap: SPACING.controlGroupGap,
     }}>
       <InteractiveWrap><ModeToggle mode={p.captureMode} onToggle={p.onToggleMode} size={sz.secondary} /></InteractiveWrap>
       <InteractiveWrap><FlipCameraButton onFlip={p.onFlipCamera} size={sz.secondary} /></InteractiveWrap>

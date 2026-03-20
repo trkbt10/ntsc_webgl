@@ -23,6 +23,7 @@ const ALL_VIDEO_CANDIDATES = Object.values(VIDEO_MIME_CANDIDATES).flat();
 const MIME_TO_EXT: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
+  "image/webp": "webp",
   "video/webm": "webm",
   "video/mp4": "mp4",
 };
@@ -44,9 +45,11 @@ function isSupported(mime: string): boolean {
   }
 }
 
-/** Whether any recording format is supported */
+/** Whether any recording format is supported (MediaRecorder + captureStream) */
 export function canRecord(): boolean {
   if (typeof MediaRecorder === "undefined") return false;
+  if (typeof HTMLCanvasElement !== "undefined" &&
+      typeof HTMLCanvasElement.prototype.captureStream !== "function") return false;
   return ALL_VIDEO_CANDIDATES.some(isSupported);
 }
 
@@ -62,6 +65,13 @@ export function getSupportedFormats(): { format: string; mimeType: string }[] {
     }
   }
   return results;
+}
+
+/** Check if a specific format family is supported */
+export function isFormatSupported(format: string): boolean {
+  if (format === "auto") return canRecord();
+  const candidates = VIDEO_MIME_CANDIDATES[format];
+  return candidates ? candidates.some(isSupported) : false;
 }
 
 /**

@@ -13,17 +13,19 @@ const MAX_DIM = 640;
  * Self-contained NTSC processing pipeline (GPU shader implementation).
  *
  * Owns the full lifecycle: WebGL 2 shader pipeline, video loop,
- * still-image management, canvas resize observation.
+ * still-image management.
  *
  * All processing runs as 7-pass fragment shaders on the GPU.
  * Video frames go directly from <video> → GPU texture → shader pipeline → screen.
+ *
+ * The canvas buffer is always kept at frame dimensions; CSS `object-fit: contain`
+ * handles display scaling. This means `toBlob()` and `captureStream()` capture
+ * only the content — no letterbox black bars.
  */
 export class NtscPipeline {
   private readonly gl: NtscGL;
   private readonly loop = new FrameLoop();
-  private readonly resizeObserver: ResizeObserver;
   private stillSource: ImageSource | null = null;
-  private lastFrame: { pixels: Uint8Array; width: number; height: number } | null = null;
 
   /** Fires when FPS measurement updates (~1/s during video mode). */
   onFpsUpdate: ((fps: number) => void) | null = null;
@@ -31,18 +33,14 @@ export class NtscPipeline {
   /** Fires when the still-source presence changes. */
   onStillChange: ((hasStill: boolean) => void) | null = null;
 
-  private constructor(canvas: HTMLCanvasElement, gl: NtscGL) {
+  private constructor(gl: NtscGL) {
     this.gl = gl;
-
     this.loop.onFpsUpdate = (fps) => this.onFpsUpdate?.(fps);
-
-    this.resizeObserver = new ResizeObserver(() => this.redrawCached());
-    this.resizeObserver.observe(canvas);
   }
 
   static create(canvas: HTMLCanvasElement): NtscPipeline {
     const gl = NtscGL.create(canvas);
-    return new NtscPipeline(canvas, gl);
+    return new NtscPipeline(gl);
   }
 
   // ---- Video mode ----
@@ -75,7 +73,6 @@ export class NtscPipeline {
   processStill(source: ImageSource): void {
     this.stopVideo();
     this.stillSource = source;
-    this.lastFrame = null;
     this.onStillChange?.(true);
     this.renderStill(source);
   }
@@ -83,7 +80,6 @@ export class NtscPipeline {
   clearStill(): void {
     if (!this.stillSource) return;
     this.stillSource = null;
-    this.lastFrame = null;
     this.onStillChange?.(false);
   }
 
@@ -111,7 +107,6 @@ export class NtscPipeline {
 
   dispose(): void {
     this.loop.stop();
-    this.resizeObserver.disconnect();
     this.gl.dispose();
   }
 
@@ -153,25 +148,11 @@ export class NtscPipeline {
     this.gl.resize(width, height);
     this.gl.processFrame(bitmap);
     bitmap.close();
-
-    // Cache for resize redraws
-    this.lastFrame = {
-      pixels: this.gl.getPixels(),
-      width,
-      height,
-    };
   }
 
   private reprocessStill(): void {
     if (this.stillSource) {
       this.renderStill(this.stillSource);
-    }
-  }
-
-  private redrawCached(): void {
-    if (this.lastFrame) {
-      // Re-render the last pass 6 output to screen with updated viewport
-      this.gl.redraw();
     }
   }
 }
